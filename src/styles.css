@@ -1,0 +1,278 @@
+:root {
+  color: #17211b;
+  background: #eef1ed;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+button {
+  border: 1px solid #c9d1c9;
+  background: #ffffff;
+  color: #17211b;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+button.primary {
+  background: #1d5f45;
+  color: #ffffff;
+  border-color: #1d5f45;
+}
+
+.app-shell {
+  min-height: 100vh;
+  padding: 22px;
+}
+
+.topbar {
+  min-height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.eyebrow {
+  margin: 0 0 4px;
+  color: #637268;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+h1, h2, h3, p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 0;
+  font-size: 30px;
+}
+
+h2 {
+  font-size: 17px;
+}
+
+h3 {
+  font-size: 13px;
+  color: #526258;
+}
+
+.status-strip {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.status-strip span,
+.agent-row span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #ffffff;
+  border: 1px solid #d8ded8;
+  border-radius: 999px;
+  padding: 7px 10px;
+  font-size: 13px;
+}
+
+.workspace-grid {
+  display: grid;
+  grid-template-columns: minmax(230px, 280px) minmax(360px, 1fr) minmax(300px, 420px);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.panel {
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid #d7ddd7;
+  border-radius: 8px;
+  padding: 16px;
+  min-height: 640px;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.stack-list {
+  margin-top: 16px;
+  display: grid;
+  gap: 10px;
+}
+
+.stack-list article {
+  border: 1px solid #dde3dd;
+  border-radius: 8px;
+  padding: 10px;
+  background: #f8faf8;
+}
+
+.stack-list strong,
+.stack-list span {
+  display: block;
+}
+
+.stack-list span {
+  color: #637268;
+  margin-top: 5px;
+  font-size: 13px;
+}
+
+.panel-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.panel-heading span {
+  color: #637268;
+  font-size: 13px;
+}
+
+.prompt-box {
+  border: 1px solid #cfd8cf;
+  background: #f9fbf9;
+  border-radius: 8px;
+  padding: 14px;
+  line-height: 1.55;
+}
+
+.notice {
+  margin-top: 12px;
+  border: 1px solid #ecd1a7;
+  background: #fff8ec;
+  color: #765020;
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+}
+
+.notice.success {
+  border-color: #b7d7bf;
+  background: #edf8ef;
+  color: #225c35;
+}
+
+.timeline {
+  list-style: none;
+  margin: 18px 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.timeline li {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border-radius: 8px;
+  background: #f3f6f3;
+}
+
+.timeline li span {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #dce8df;
+  color: #1d5f45;
+  font-weight: 700;
+}
+
+.agent-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.file-tree {
+  min-height: 260px;
+  background: #152019;
+  color: #d8f0df;
+  border-radius: 8px;
+  padding: 14px;
+  overflow: auto;
+  line-height: 1.6;
+}
+
+.preview-box {
+  border: 1px dashed #aab8ad;
+  border-radius: 8px;
+  min-height: 110px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.roundtable {
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid #d8ded8;
+  border-radius: 8px;
+  background: #f8faf8;
+}
+
+.provider-box {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.provider-box h3 {
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.provider-box span {
+  border: 1px solid #d8ded8;
+  border-radius: 999px;
+  padding: 6px 9px;
+  font-size: 12px;
+}
+
+@media (max-width: 1040px) {
+  .workspace-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .panel {
+    min-height: auto;
+  }
+}
