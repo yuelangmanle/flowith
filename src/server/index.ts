@@ -842,9 +842,23 @@ export async function createServer() {
 
 // ─── Start ──────────────────────────────────────────────────────
 
+// ─── Global error handlers ────────────────────────────────
+process.on("uncaughtException", (err) => {
+  console.error("[FATAL] Uncaught exception:", err.message);
+  // Don't crash — keep serving
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("[FATAL] Unhandled rejection:", reason);
+  // Don't crash — keep serving
+});
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   const port = Number(process.env.AGENT_API_PORT ?? 8787);
   const server = await createServer();
+  server.on("error", (err) => {
+    console.error("[SERVER] Error:", err.message);
+  });
   server.listen(port, "127.0.0.1", () => {
     console.log(`Agent API v0.3.0 listening on http://127.0.0.1:${port}`);
   });
