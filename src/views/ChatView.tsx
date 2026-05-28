@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Copy, Loader2, RefreshCw, Search, Send, Volume2, VolumeX } from "lucide-react";
+import { Copy, ExternalLink, Loader2, Play, RefreshCw, Search, Send, Square, Volume2, VolumeX } from "lucide-react";
 import { useStore } from "../lib/store";
 import { apiFetch, formatTime, getProviderIcon, uid } from "../lib/shared";
 import { saveProviders } from "../core/persistence";
@@ -25,6 +25,8 @@ export function ChatView() {
   const [streamingAgent, setStreamingAgent] = useState<{ id: string; name: string; color: string; avatar: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastSpokenMsgRef = useRef<string>("");
+  const [continuousTts, setContinuousTts] = useState(false);
+  const continuousTtsRef = useRef(false);
 
   // Auto-select first provider+model
   useEffect(() => {
@@ -56,6 +58,27 @@ export function ChatView() {
       speakText(lastMsg.content, lastMsg.agentId);
     }
   }, [activeConversation?.messages, ttsEnabled, agentTTSConfigs]); // eslint-disable-line
+
+  const renderCitations = (content: string) => {
+    // Extract URLs from content that look like citations
+    const urlRegex = /\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g;
+    const urls: Array<{ text: string; url: string }> = [];
+    let match;
+    while ((match = urlRegex.exec(content)) !== null) {
+      urls.push({ text: match[1], url: match[2] });
+    }
+    if (urls.length === 0) return null;
+    return (
+      <div style={{ marginTop: 6, padding: "4px 8px", borderRadius: 6, background: "var(--bg)", border: "1px solid var(--border)", fontSize: 11 }}>
+        <div style={{ color: "var(--text-muted)", marginBottom: 3, fontSize: 10 }}>📎 来源引用:</div>
+        {urls.map((u, i) => (
+          <a key={i} href={u.url} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 3, color: "var(--primary)", marginRight: 8, fontSize: 11 }}>
+            <ExternalLink size={10} /> {u.text.slice(0, 40)}
+          </a>
+        ))}
+      </div>
+    );
+  };
 
   const copyToClipboard = async (text: string) => {
     try { await navigator.clipboard.writeText(text); showToast("已复制到剪贴板", "success"); } catch { showToast("复制失败", "error"); }
@@ -92,6 +115,28 @@ export function ChatView() {
       showToast(`TTS 错误: ${err instanceof Error ? err.message : String(err)}`, "error");
     }
   }, [ttsEnabled, agentTTSConfigs, setTtsPlaying, showToast]);
+
+  const startContinuousTts = useCallback(async () => {
+    if (!activeConversation) return;
+    setContinuousTts(true);
+    continuousTtsRef.current = true;
+    const messages = activeConversation.messages.filter((m) => m.role === "assistant" && m.content && m.content !== "(无响应)");
+    for (const msg of messages) {
+      if (!continuousTtsRef.current) break;
+      await speakText(msg.content, msg.agentId);
+      // Wait for current playback to finish
+      while (useStore.getState().ttsPlaying && continuousTtsRef.current) {
+        await new Promise((r) => setTimeout(r, 200));
+      }
+    }
+    setContinuousTts(false);
+    continuousTtsRef.current = false;
+  }, [activeConversation, speakText]);
+
+  const stopContinuousTts = useCallback(() => {
+    setContinuousTts(false);
+    continuousTtsRef.current = false;
+  }, []);
 
   const sendChatMessage = useCallback(async (message: string) => {
     if (!message.trim() || streaming) return;
@@ -220,6 +265,7 @@ export function ChatView() {
                   </div>
                 )}
                 <div style={{ whiteSpace: "pre-wrap" }}>{msg.content}</div>
+                {msg.role === "assistant" && renderCitations(msg.content)}
                 {msg.role === "assistant" && (
                   <div style={{ display: "flex", gap: 4, marginTop: 4, alignItems: "center" }}>
                     <button className="icon-btn" onClick={() => copyToClipboard(msg.content)} title="复制" style={{ fontSize: 11, padding: "2px 4px", display: "inline-flex", alignItems: "center" }}>
@@ -334,6 +380,11 @@ export function ChatView() {
                 </button>
               );
             })()}
+            {ttsEnabled && (
+              <button className="icon-btn" onClick={continuousTts ? stopContinuousTts : startContinuousTts} title={continuousTts ? "停止连续朗读" : "连续朗读全部"} style={{ color: continuousTts ? "var(--accent)" : "var(--text-muted)" }}>
+                {continuousTts ? <Square size={12} /> : <Play size={12} />}
+              </button>
+            )}
             <button className={`icon-btn ${ttsEnabled ? "tts-active" : ""}`} onClick={() => setTtsEnabled(!ttsEnabled)} title={ttsEnabled ? "关闭语音朗读" : "开启语音朗读"} style={{ color: ttsEnabled ? "var(--primary)" : "var(--text-muted)" }}>
               {ttsEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
             </button>
