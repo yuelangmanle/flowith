@@ -197,8 +197,9 @@ export function App() {
                   </div>
                 ))}
               </div>
-              <div className="sidebar-section" style={{ borderTop: "1px solid var(--border)", paddingTop: 8, marginTop: 4 }}>快速 1v1 对话</div>
-              <div style={{ padding: "0 8px 8px", display: "flex", flexDirection: "column", gap: 2, maxHeight: 200, overflowY: "auto", flexShrink: 0 }}>
+              <div className="sidebar-bottom">
+              <div className="sidebar-section">快速 1v1 对话</div>
+              <div className="sidebar-bottom-scroll" style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 {/* 无预设自由对话 */}
                 <button className="nav-item" style={{ justifyContent: "flex-start", gap: 8, fontSize: 12, padding: "5px 8px" }} onClick={() => {
                   const conv = createConversation("chat", "自由对话");
@@ -222,6 +223,7 @@ export function App() {
                 ))}
               </div>
             </div>
+              </div>
           )}
           <div className="main-content">
             {view === "chat" && <ChatView />}
