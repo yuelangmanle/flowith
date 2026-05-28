@@ -72,6 +72,35 @@ export function App() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
+  // Roundtable state
+  const [rtTopic, setRtTopic] = useState("");
+  const [rtAgents, setRtAgents] = useState<string[]>(["agent-moderator", "agent-product", "agent-architecture", "agent-critic"]);
+  const [rtRounds, setRtRounds] = useState(3);
+  const [rtStreaming, setRtStreaming] = useState(false);
+  const [rtMessages, setRtMessages] = useState<Array<{ agentId: string; agentName: string; agentColor: string; agentAvatar: string; content: string; round: number }>>([]);
+  const [rtReport, setRtReport] = useState<StructuredReport | null>(null);
+
+  // Code generation state
+  const [cgIdea, setCgIdea] = useState("");
+  const [cgStack, setCgStack] = useState("Vite + React + TypeScript");
+  const [cgStreaming, setCgStreaming] = useState(false);
+  const [cgMessages, setCgMessages] = useState<Array<{ phase: string; content: string; agentName: string }>>([]);
+  const [cgPhase, setCgPhase] = useState("");
+
+  // Agent management state
+  const [showCreateAgent, setShowCreateAgent] = useState(false);
+  const [newAgentName, setNewAgentName] = useState("");
+  const [newAgentRole, setNewAgentRole] = useState<AgentConfig["role"]>("coder");
+  const [newAgentPrompt, setNewAgentPrompt] = useState("");
+  const [newAgentAvatar, setNewAgentAvatar] = useState("🤖");
+
+  // Toast notification
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
+  const showToast = useCallback((message: string, type: "success" | "error" | "info" = "info") => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  }, []);
+
   const activeConversation = conversations.find((c) => c.id === activeConvId) ?? null;
 
   // Server health check
@@ -154,21 +183,25 @@ export function App() {
 
   const createConversation = useCallback((type: Conversation["type"] = "chat", title = "新对话") => {
     const conv: Conversation = { id: uid(), title, type, agentIds: [], messages: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
-    const updated = [conv, ...conversations];
-    setConversations(updated);
     setActiveConvId(conv.id);
-    saveConversation(conv);
-    syncConversationsToServer(updated);
+    setConversations((prev) => {
+      const next = [conv, ...prev];
+      saveConversation(conv);
+      syncConversationsToServer(next);
+      return next;
+    });
     return conv;
-  }, [conversations]);
+  }, []);
 
   const deleteConversation = useCallback((id: string) => {
-    const updated = conversations.filter((c) => c.id !== id);
-    setConversations(updated);
-    if (activeConvId === id) setActiveConvId(updated[0]?.id ?? null);
-    deleteConv(id);
-    syncConversationsToServer(updated);
-  }, [conversations, activeConvId]);
+    setActiveConvId((prev) => prev === id ? null : prev);
+    setConversations((prev) => {
+      const next = prev.filter((c) => c.id !== id);
+      deleteConv(id);
+      syncConversationsToServer(next);
+      return next;
+    });
+  }, []);
 
   const sendChatMessage = useCallback(async (message: string) => {
     if (!message.trim() || streaming) return;
@@ -280,6 +313,7 @@ export function App() {
   }, [activeConversation, conversations, streaming, selectedAgentId, agents, createConversation]);
 
   // ─── View: Chat ───────────────────────────────────────
+  const hasConfiguredProvider = providers.some((p) => p.enabled && (p.apiKey || p.type === "ollama"));
   const renderChat = () => (
     <div className="chat-container">
       <div className="chat-messages">
@@ -287,12 +321,20 @@ export function App() {
           <div className="empty-state">
             <div className="empty-icon">🤖</div>
             <div className="empty-text">开始对话</div>
-            <div className="empty-hint">选择一个 Agent，输入消息开始交流</div>
-            <div className="quick-actions" style={{ marginTop: 16 }}>
-              {["帮我写一个 TODO 应用", "解释一下 React Hooks", "如何优化 Web 性能？"].map((q) => (
-                <button key={q} className="quick-action-btn" onClick={() => sendChatMessage(q)}>{q}</button>
-              ))}
-            </div>
+            {!hasConfiguredProvider ? (
+              <div className="notice" style={{ marginTop: 12, cursor: "pointer" }} onClick={() => setView("settings")}>
+                ⚠️ 尚未配置 AI 供应商，点击此处前往设置
+              </div>
+            ) : (
+              <>
+                <div className="empty-hint">选择一个 Agent，输入消息开始交流</div>
+                <div className="quick-actions" style={{ marginTop: 16 }}>
+                  {["帮我写一个 TODO 应用", "解释一下 React Hooks", "如何优化 Web 性能？"].map((q) => (
+                    <button key={q} className="quick-action-btn" onClick={() => sendChatMessage(q)}>{q}</button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         )}
         {activeConversation?.messages.map((msg) => (
@@ -359,12 +401,6 @@ export function App() {
   );
 
   // ─── View: Roundtable ─────────────────────────────────
-  const [rtTopic, setRtTopic] = useState("");
-  const [rtAgents, setRtAgents] = useState<string[]>(["agent-moderator", "agent-product", "agent-architecture", "agent-critic"]);
-  const [rtRounds, setRtRounds] = useState(3);
-  const [rtStreaming, setRtStreaming] = useState(false);
-  const [rtMessages, setRtMessages] = useState<Array<{ agentId: string; agentName: string; agentColor: string; agentAvatar: string; content: string; round: number }>>([]);
-  const [rtReport, setRtReport] = useState<StructuredReport | null>(null);
 
   const startRoundtable = useCallback(async () => {
     if (!rtTopic.trim() || rtStreaming) return;
@@ -542,11 +578,7 @@ export function App() {
   );
 
   // ─── View: Code Generation ────────────────────────────
-  const [cgIdea, setCgIdea] = useState("");
-  const [cgStack, setCgStack] = useState("Vite + React + TypeScript");
-  const [cgStreaming, setCgStreaming] = useState(false);
-  const [cgMessages, setCgMessages] = useState<Array<{ phase: string; content: string; agentName: string }>>([]);
-  const [cgPhase, setCgPhase] = useState("");
+
 
   const startCodeGen = useCallback(async () => {
     if (!cgIdea.trim() || cgStreaming) return;
@@ -748,7 +780,7 @@ export function App() {
                   <button onClick={async () => {
                     const resp = await apiFetch("/api/providers/test", { method: "POST", body: JSON.stringify({ providerId: p.id }) });
                     const data = await resp.json() as { ok: boolean; modelCount: number; latencyMs: number; error?: string };
-                    alert(data.ok ? `连接成功! ${data.modelCount} 模型, ${data.latencyMs}ms` : `连接失败: ${data.error}`);
+                    showToast(data.ok ? `连接成功! ${data.modelCount} 模型, ${data.latencyMs}ms` : `连接失败: ${data.error}`, data.ok ? "success" : "error");
                   }}>
                     <ShieldCheck size={14} /> 测试连接
                   </button>
@@ -761,7 +793,7 @@ export function App() {
                       const newProviders = providers.map((pp) => pp.id === p.id ? updated : pp);
                       setProviders(newProviders);
                       saveProviders(newProviders);
-                      alert(`发现 ${data.count} 个模型`);
+                      showToast(`发现 ${data.count} 个模型`, "success");
                     }
                   }}>
                     <RefreshCw size={14} /> 发现模型
@@ -776,12 +808,6 @@ export function App() {
   );
 
   // ─── View: Custom Agents ──────────────────────────────
-  const [showCreateAgent, setShowCreateAgent] = useState(false);
-  const [newAgentName, setNewAgentName] = useState("");
-  const [newAgentRole, setNewAgentRole] = useState<AgentConfig["role"]>("coder");
-  const [newAgentPrompt, setNewAgentPrompt] = useState("");
-  const [newAgentAvatar, setNewAgentAvatar] = useState("🤖");
-
   const renderAgents = () => (
     <div style={{ padding: 20, overflowY: "auto", flex: 1 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
@@ -998,6 +1024,18 @@ export function App() {
           {rightPanelOpen && renderRightPanel()}
         </div>
       </div>
+      {toast && (
+        <div style={{
+          position: "fixed", bottom: 20, right: 20, zIndex: 1000,
+          padding: "10px 16px", borderRadius: 8,
+          background: toast.type === "success" ? "rgba(107,203,119,0.95)" : toast.type === "error" ? "rgba(255,107,107,0.95)" : "rgba(77,150,255,0.95)",
+          color: "white", fontSize: 13, fontWeight: 500,
+          boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+          animation: "fadeIn 0.2s ease-out",
+        }}>
+          {toast.message}
+        </div>
+      )}
     </ErrorBoundary>
   );
 }

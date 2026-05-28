@@ -1068,3 +1068,10 @@ button.danger:hover { background: rgba(255, 107, 107, 0.2); }
   color: var(--primary-dark);
   background: var(--primary-dim);
 }
+
+/* ─── Toast Animation ────────────────────────────────── */
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
