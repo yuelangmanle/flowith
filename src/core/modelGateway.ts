@@ -141,18 +141,37 @@ export async function callChatCompletion(
     return callGemini(req, fetcher);
   }
 
-  // OpenAI-compatible: openai, deepseek, qwen, moonshot, ollama, custom
+  // OpenAI-compatible: openai, deepseek, qwen, moonshot, ollama, xiaomi-mimo, custom
   const url = buildUrl(provider, `/chat/completions`);
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (provider.apiKey) headers["Authorization"] = `Bearer ${provider.apiKey}`;
+  if (provider.apiKey) {
+    headers["Authorization"] = `Bearer ${provider.apiKey}`;
+    // MiMo supports both auth methods
+    if (provider.type === "xiaomi-mimo") headers["api-key"] = provider.apiKey;
+  }
 
-  const body = JSON.stringify({
+  // Build request body with provider-specific optimizations
+  const bodyObj: Record<string, unknown> = {
     model,
     messages: req.messages,
     temperature: req.temperature ?? 0.7,
     max_tokens: req.maxTokens ?? 4096,
     stream: false,
-  });
+  };
+
+  // MiMo: inject web search tools when enabled
+  if (provider.type === "xiaomi-mimo") {
+    bodyObj.thinking = { type: "disabled" };
+    if (req.enableWebSearch ?? provider.webSearchEnabled) {
+      bodyObj.tools = [{
+        type: "web_search",
+        max_keyword: req.webSearchMaxKeyword ?? provider.webSearchMaxKeyword ?? 3,
+        force_search: true,
+      }];
+    }
+  }
+
+  const body = JSON.stringify(bodyObj);
 
   const response = await fetcher(url, { method: "POST", headers, body });
   if (!response.ok) {
@@ -192,15 +211,33 @@ export async function* streamChatCompletion(
   // OpenAI-compatible streaming
   const url = buildUrl(provider, `/chat/completions`);
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (provider.apiKey) headers["Authorization"] = `Bearer ${provider.apiKey}`;
+  if (provider.apiKey) {
+    headers["Authorization"] = `Bearer ${provider.apiKey}`;
+    if (provider.type === "xiaomi-mimo") headers["api-key"] = provider.apiKey;
+  }
 
-  const body = JSON.stringify({
+  // Build request body with provider-specific optimizations
+  const streamBodyObj: Record<string, unknown> = {
     model: req.model,
     messages: req.messages,
     temperature: req.temperature ?? 0.7,
     max_tokens: req.maxTokens ?? 4096,
     stream: true,
-  });
+  };
+
+  // MiMo: inject web search tools when enabled
+  if (provider.type === "xiaomi-mimo") {
+    streamBodyObj.thinking = { type: "disabled" };
+    if (req.enableWebSearch ?? provider.webSearchEnabled) {
+      streamBodyObj.tools = [{
+        type: "web_search",
+        max_keyword: req.webSearchMaxKeyword ?? provider.webSearchMaxKeyword ?? 3,
+        force_search: true,
+      }];
+    }
+  }
+
+  const body = JSON.stringify(streamBodyObj);
 
   const response = await fetcher(url, { method: "POST", headers, body });
   if (!response.ok) {
@@ -587,7 +624,9 @@ export async function callMiMoTTS(
   req: MiMoTTSRequest,
   fetcher: typeof fetch = fetch
 ): Promise<{ audioBase64: string; format: string }> {
-  const url = `${req.provider.baseUrl.replace(/\/\/$/, "")}/chat/completions`;
+  // Use altBaseUrl if set, otherwise default baseUrl
+  const baseUrl = req.provider.altBaseUrl || req.provider.baseUrl;
+  const url = `${baseUrl.replace(/\/$/, "")}/chat/completions`;
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     "api-key": req.provider.apiKey,
@@ -596,7 +635,7 @@ export async function callMiMoTTS(
 
   const messages: Array<{ role: string; content: string }> = [];
 
-  // style prompt goes in user message
+  // style prompt goes in user message (per MiMo docs: natural language style instructions)
   if (req.stylePrompt) {
     messages.push({ role: "user", content: req.stylePrompt });
   }
@@ -604,13 +643,19 @@ export async function callMiMoTTS(
   // text to synthesize goes in assistant message
   messages.push({ role: "assistant", content: req.text });
 
+  const audioConfig: Record<string, unknown> = {
+    format: req.format ?? "wav",
+    voice: req.voice ?? "mimo_default",
+  };
+  // Pass speed if specified (0.5 - 2.0)
+  if (req.speed !== undefined && req.speed !== 1.0) {
+    audioConfig.speed = req.speed;
+  }
+
   const body = JSON.stringify({
     model: req.model ?? "mimo-v2.5-tts",
     messages,
-    audio: {
-      format: req.format ?? "wav",
-      voice: req.voice ?? "mimo_default",
-    },
+    audio: audioConfig,
   });
 
   const response = await fetcher(url, {

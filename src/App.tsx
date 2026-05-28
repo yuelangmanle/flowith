@@ -4,12 +4,12 @@ import {
   Loader2, MessageSquare, MessageSquarePlus, PanelLeftClose,
   PanelLeftOpen, Play, Plus, RefreshCw, Send, Settings,
   ShieldCheck, Trash2, Users, X, Zap, Vote, FileText,
-  Brain, Code2, Microscope, BookOpen, Square,
+  Brain, Code2, Microscope, BookOpen, Square, Volume2, VolumeX, Search,
 } from "lucide-react";
 import { createDefaultProviders, getFallbackModels } from "./core/modelGateway";
 import { loadProviders, saveProviders, loadConversations, saveConversation, deleteConversation as deleteConv } from "./core/persistence";
 import { DEFAULT_AGENTS, createUserAgent } from "./core/agentConfig";
-import type { AgentConfig, ChatMessage, Conversation, ModelConfig, ProviderConfig, StructuredReport } from "./core/types";
+import type { AgentConfig, AgentTTSConfig, ChatMessage, Conversation, ModelConfig, ProviderConfig, StructuredReport } from "./core/types";
 import { projectTemplates, appMetadata, roundtableTopics } from "./core/demoData";
 
 const API_BASE = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
@@ -72,12 +72,14 @@ export function App() {
   const [selectedProviderId, setSelectedProviderId] = useState<string>("");
   const [selectedModelId, setSelectedModelId] = useState<string>("");
   const [agentModelConfigs, setAgentModelConfigs] = useState<Array<{ agentId: string; providerId: string; modelId: string; useGlobal?: boolean }>>([]);
+  const [agentTTSConfigs, setAgentTTSConfigs] = useState<AgentTTSConfig[]>([]);
   const [ttsEnabled, setTtsEnabled] = useState(false);
   const [ttsPlaying, setTtsPlaying] = useState(false);
   const [ttsVoice, setTtsVoice] = useState("mimo_default");
   const [ttsStylePrompt, setTtsStylePrompt] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const lastSpokenMsgRef = useRef<string>("");
 
   // Roundtable state
   const [rtTopic, setRtTopic] = useState("");
@@ -336,16 +338,26 @@ export function App() {
 
   // ─── TTS ─────────────────────────────────────────────
   const speakText = useCallback(async (text: string, agentId?: string) => {
-    if (!ttsEnabled) return;
+    // Check if TTS is enabled globally or per-agent
+    const agentTTS = agentId ? agentTTSConfigs.find((c) => c.agentId === agentId) : undefined;
+    if (!ttsEnabled && !agentTTS?.enabled) return;
+
+    // Use per-agent settings if available, otherwise global
+    const voice = agentTTS?.voice ?? ttsVoice;
+    const stylePrompt = agentTTS?.stylePrompt ?? ttsStylePrompt;
+    const speed = agentTTS?.speed;
+
     setTtsPlaying(true);
     try {
       const resp = await apiFetch("/api/tts", {
         method: "POST",
         body: JSON.stringify({
           text: text.slice(0, 2000),
-          voice: ttsVoice,
-          stylePrompt: ttsStylePrompt || undefined,
+          voice,
+          stylePrompt: stylePrompt || undefined,
+          speed,
           format: "wav",
+          agentId,
         }),
       });
       if (resp.ok) {
@@ -366,7 +378,7 @@ export function App() {
       setTtsPlaying(false);
       showToast(`TTS 错误: ${err instanceof Error ? err.message : String(err)}`, "error");
     }
-  }, [ttsEnabled, ttsVoice, ttsStylePrompt, showToast]);
+  }, [ttsEnabled, ttsVoice, ttsStylePrompt, agentTTSConfigs, showToast]);
 
   // ─── View: Chat ───────────────────────────────────────
   // Get effective provider+model for an agent (per-agent config or global)
@@ -439,11 +451,23 @@ export function App() {
             </div>
             <div>
               <div className="msg-bubble">
-                {msg.agentName && <div className="msg-agent-name" style={{ color: msg.agentColor }}>{msg.agentAvatar} {msg.agentName}</div>}
+                {msg.agentName && (
+                  <div className="msg-agent-name" style={{ color: msg.agentColor }}>
+                    {msg.agentAvatar} {msg.agentName}
+                    {(() => {
+                      const agentCfg = agentModelConfigs.find((c) => c.agentId === msg.agentId && !c.useGlobal);
+                      const providerId = agentCfg?.providerId ?? selectedProviderId;
+                      const modelId = agentCfg?.modelId ?? selectedModelId;
+                      const provider = providers.find((p) => p.id === providerId);
+                      if (!modelId) return null;
+                      return <span style={{ fontSize: 10, color: "var(--text-muted)", marginLeft: 6, fontWeight: 400 }}>{getProviderIcon(provider?.type ?? "")} {modelId}</span>;
+                    })()}
+                  </div>
+                )}
                 <div style={{ whiteSpace: "pre-wrap" }}>{msg.content}</div>
-                {msg.role === "assistant" && ttsEnabled && (
-                  <button className="icon-btn" style={{ marginTop: 4, fontSize: 12, padding: "2px 6px" }} onClick={() => speakText(msg.content, msg.agentId)} disabled={ttsPlaying}>
-                    {ttsPlaying ? "⏳" : "🔊"}
+                {msg.role === "assistant" && (ttsEnabled || agentTTSConfigs.find((c) => c.agentId === msg.agentId)?.enabled) && (
+                  <button className="icon-btn" style={{ marginTop: 4, fontSize: 12, padding: "2px 6px", display: "inline-flex", alignItems: "center", gap: 3 }} onClick={() => speakText(msg.content, msg.agentId)} disabled={ttsPlaying} title="朗读此消息">
+                    {ttsPlaying ? "⏳" : <Volume2 size={12} />}
                   </button>
                 )}
               </div>
@@ -885,7 +909,45 @@ export function App() {
                 {p.type === "xiaomi-mimo" && (
                   <>
                     <div className="field-row">
-                      <label>备用 URL</label>
+                      <label>API Key</label>
+                      <input
+                        type="password"
+                        placeholder="输入 MiMo API Key"
+                        value={p.apiKey}
+                        onChange={(e) => {
+                          const updated = { ...p, apiKey: e.target.value };
+                          const newProviders = providers.map((pp) => pp.id === p.id ? updated : pp);
+                          setProviders(newProviders);
+                          saveProviders(newProviders);
+                        }}
+                        onBlur={() => syncProvidersToServer(providers)}
+                      />
+                    </div>
+                    <div className="field-row">
+                      <label>API 地址</label>
+                      <select
+                        value={p.altBaseUrl || p.baseUrl}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          let updated: ProviderConfig;
+                          if (v === "https://token-plan-cn.xiaomimimo.com/v1") {
+                            updated = { ...p, baseUrl: "https://api.xiaomimimo.com/v1", altBaseUrl: v };
+                          } else {
+                            updated = { ...p, baseUrl: v, altBaseUrl: undefined };
+                          }
+                          const newProviders = providers.map((pp) => pp.id === p.id ? updated : pp);
+                          setProviders(newProviders);
+                          saveProviders(newProviders);
+                          syncProvidersToServer(newProviders);
+                        }}
+                        style={{ flex: 1, padding: "6px 10px", borderRadius: 6, border: "1px solid var(--border)" }}
+                      >
+                        <option value="https://api.xiaomimimo.com/v1">标准 (api.xiaomimimo.com)</option>
+                        <option value="https://token-plan-cn.xiaomimimo.com/v1">Token Plan CN</option>
+                      </select>
+                    </div>
+                    <div className="field-row">
+                      <label>联网搜索</label>
                       <select
                         value={p.altBaseUrl ?? ""}
                         onChange={(e) => {
@@ -969,9 +1031,29 @@ export function App() {
                           </select>
                         </div>
                         <div className="field-row">
+                          <label>语速</label>
+                          <select
+                            value={p.ttsSpeed ?? 1.0}
+                            onChange={(e) => {
+                              const updated = { ...p, ttsSpeed: parseFloat(e.target.value) };
+                              const newProviders = providers.map((pp) => pp.id === p.id ? updated : pp);
+                              setProviders(newProviders);
+                              saveProviders(newProviders);
+                            }}
+                            style={{ flex: 1, padding: "6px 10px", borderRadius: 6, border: "1px solid var(--border)" }}
+                          >
+                            <option value="0.5">0.5x 慢速</option>
+                            <option value="0.75">0.75x</option>
+                            <option value="1.0">1.0x 正常</option>
+                            <option value="1.25">1.25x</option>
+                            <option value="1.5">1.5x 快速</option>
+                            <option value="2.0">2.0x 极快</option>
+                          </select>
+                        </div>
+                        <div className="field-row">
                           <label>风格指令</label>
                           <input
-                            placeholder="如: 温柔活泼的语调，语速稍快"
+                            placeholder="如: 温柔/活泼/磁性/严肃/东北话/粤语/唱歌..."
                             value={p.ttsStylePrompt ?? ttsStylePrompt}
                             onChange={(e) => {
                               setTtsStylePrompt(e.target.value);
@@ -981,6 +1063,9 @@ export function App() {
                               saveProviders(newProviders);
                             }}
                           />
+                        </div>
+                        <div style={{ fontSize: 11, color: "var(--text-muted)", padding: "0 0 4px", lineHeight: 1.5 }}>
+                          支持风格: 情感(温柔/高冷/活泼/严肃/慵懒) | 音色(磁性/醇厚/清亮/空灵/甜美) | 腔调(御姐音/正太音/大叔音/台湾腔) | 方言(东北话/四川话/粤语)
                         </div>
                         <div className="field-row">
                           <label>测试 TTS</label>
@@ -1129,14 +1214,13 @@ export function App() {
               }}><Trash2 size={14} /></button>
             )}
           </div>
-          <div style={{ display: "flex", gap: 6, marginTop: 6, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 6, marginTop: 6, alignItems: "center", flexWrap: "wrap" }}>
             <span style={{ fontSize: 11, color: "var(--text-muted)", minWidth: 50 }}>模型:</span>
             <select
               value={agentCfg?.providerId ?? ""}
               onChange={(e) => {
                 const newProviderId = e.target.value;
                 if (!newProviderId) {
-                  // Use global
                   const newConfigs = agentModelConfigs.filter((c) => c.agentId !== a.id);
                   setAgentModelConfigs(newConfigs);
                   apiFetch("/api/agent-models", { method: "PUT", body: JSON.stringify({ configs: newConfigs }) });
@@ -1152,7 +1236,7 @@ export function App() {
             >
               <option value="">全局</option>
               {providers.filter((p) => p.enabled).map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
+                <option key={p.id} value={p.id}>{getProviderIcon(p.type)} {p.name}</option>
               ))}
             </select>
             <select
@@ -1164,17 +1248,110 @@ export function App() {
                 setAgentModelConfigs(newConfigs);
                 apiFetch("/api/agent-models", { method: "PUT", body: JSON.stringify({ configs: newConfigs }) });
               }}
-              style={{ padding: "3px 6px", borderRadius: 4, border: "1px solid var(--border)", fontSize: 11, background: "var(--bg-card)", maxWidth: 140 }}
+              style={{ padding: "3px 6px", borderRadius: 4, border: "1px solid var(--border)", fontSize: 11, background: "var(--bg-card)", maxWidth: 200 }}
             >
               {!agentCfg && <option value="">{effectiveModel}</option>}
               {agentCfg && models.filter((m) => m.providerId === agentCfg.providerId).map((m) => (
-                <option key={m.id} value={m.id}>{m.id}</option>
+                <option key={m.id} value={m.id}>{m.id} {m.capabilities.reasoning ? "🧠" : ""}{m.capabilities.fast ? "⚡" : ""}{m.capabilities.vision ? "👁" : ""}</option>
               ))}
             </select>
             {agentCfg && (
               <span style={{ fontSize: 10, color: "var(--primary)" }}>✓ 自定义</span>
             )}
           </div>
+          {/* Per-Agent TTS Config */}
+          {(() => {
+            const agentTTS = agentTTSConfigs.find((c) => c.agentId === a.id);
+            const mimoProvider = providers.find((p) => p.type === "xiaomi-mimo" && p.enabled && p.apiKey);
+            if (!mimoProvider) return null;
+            return (
+              <div style={{ marginTop: 6, padding: "6px 8px", borderRadius: 6, background: "var(--bg)", border: "1px solid var(--border)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                  <Volume2 size={12} style={{ color: "var(--text-muted)" }} />
+                  <span style={{ fontSize: 11, color: "var(--text-muted)" }}>语音设置</span>
+                  <button
+                    className={`toggle-switch ${agentTTS?.enabled ? "on" : ""}`}
+                    onClick={() => {
+                      const existing = agentTTSConfigs.find((c) => c.agentId === a.id);
+                      const newConfig: AgentTTSConfig = {
+                        agentId: a.id,
+                        enabled: !existing?.enabled,
+                        voice: existing?.voice ?? "mimo_default",
+                        speed: existing?.speed,
+                        stylePrompt: existing?.stylePrompt,
+                        autoSpeak: existing?.autoSpeak,
+                      };
+                      const newConfigs = [...agentTTSConfigs.filter((c) => c.agentId !== a.id), newConfig];
+                      setAgentTTSConfigs(newConfigs);
+                      apiFetch("/api/agent-tts-configs", { method: "PUT", body: JSON.stringify({ configs: newConfigs }) });
+                      if (newConfig.enabled) setTtsEnabled(true);
+                    }}
+                    style={{ transform: "scale(0.8)" }}
+                  />
+                </div>
+                {agentTTS?.enabled && (
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                    <select
+                      value={agentTTS.voice ?? "mimo_default"}
+                      onChange={(e) => {
+                        const newConfigs = agentTTSConfigs.map((c) =>
+                          c.agentId === a.id ? { ...c, voice: e.target.value } : c
+                        );
+                        setAgentTTSConfigs(newConfigs);
+                        apiFetch("/api/agent-tts-configs", { method: "PUT", body: JSON.stringify({ configs: newConfigs }) });
+                      }}
+                      style={{ padding: "2px 4px", borderRadius: 4, border: "1px solid var(--border)", fontSize: 11, background: "var(--bg-card)" }}
+                    >
+                      <option value="mimo_default">默认</option>
+                      <option value="冰糖">冰糖 ♀</option>
+                      <option value="茉莉">茉莉 ♀</option>
+                      <option value="苏打">苏打 ♂</option>
+                      <option value="白桦">白桦 ♂</option>
+                      <option value="Mia">Mia EN</option>
+                    </select>
+                    <select
+                      value={agentTTS.speed ?? 1.0}
+                      onChange={(e) => {
+                        const newConfigs = agentTTSConfigs.map((c) =>
+                          c.agentId === a.id ? { ...c, speed: parseFloat(e.target.value) } : c
+                        );
+                        setAgentTTSConfigs(newConfigs);
+                        apiFetch("/api/agent-tts-configs", { method: "PUT", body: JSON.stringify({ configs: newConfigs }) });
+                      }}
+                      style={{ padding: "2px 4px", borderRadius: 4, border: "1px solid var(--border)", fontSize: 11, background: "var(--bg-card)" }}
+                    >
+                      <option value="0.5">0.5x</option>
+                      <option value="0.75">0.75x</option>
+                      <option value="1.0">1.0x</option>
+                      <option value="1.25">1.25x</option>
+                      <option value="1.5">1.5x</option>
+                      <option value="2.0">2.0x</option>
+                    </select>
+                    <input
+                      placeholder="风格: 温柔/活泼/严肃..."
+                      value={agentTTS.stylePrompt ?? ""}
+                      onChange={(e) => {
+                        const newConfigs = agentTTSConfigs.map((c) =>
+                          c.agentId === a.id ? { ...c, stylePrompt: e.target.value } : c
+                        );
+                        setAgentTTSConfigs(newConfigs);
+                      }}
+                      onBlur={() => apiFetch("/api/agent-tts-configs", { method: "PUT", body: JSON.stringify({ configs: agentTTSConfigs }) })}
+                      style={{ padding: "2px 6px", borderRadius: 4, border: "1px solid var(--border)", fontSize: 11, background: "var(--bg-card)", flex: 1, minWidth: 100 }}
+                    />
+                    <button
+                      className="icon-btn"
+                      onClick={() => speakText("你好，很高兴认识你！", a.id)}
+                      disabled={ttsPlaying}
+                      style={{ fontSize: 11, padding: "2px 6px" }}
+                    >
+                      {ttsPlaying ? "⏳" : "🔊"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
         );
       })}
@@ -1345,6 +1522,7 @@ function getProviderIcon(type: string): string {
   const icons: Record<string, string> = {
     openai: "🟢", anthropic: "🟠", gemini: "🔵", deepseek: "🟣",
     qwen: "🟡", moonshot: "🌙", ollama: "🦙", "openai-compatible": "⚪",
+    "xiaomi-mimo": "🔵",
   };
   return icons[type] ?? "⚪";
 }

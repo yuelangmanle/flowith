@@ -42,6 +42,7 @@ const providersFile = resolve(dataDir, "providers.json");
 const conversationsFile = resolve(dataDir, "conversations.json");
 const agentsFile = resolve(dataDir, "agents.json");
 const agentModelFile = resolve(dataDir, "agent-models.json");
+const agentTTSFile = resolve(dataDir, "agent-tts.json");
 const memoryFile = resolve(dataDir, "memory.json");
 
 // ─── State ──────────────────────────────────────────────────────
@@ -49,6 +50,7 @@ const memoryFile = resolve(dataDir, "memory.json");
 let providers: ProviderConfig[] = createDefaultProviders();
 let agents: AgentConfig[] = [...DEFAULT_AGENTS];
 let agentModelConfigs: Array<{ agentId: string; providerId: string; modelId: string; useGlobal?: boolean }> = [];
+let agentTTSConfigs: Array<{ agentId: string; enabled: boolean; voice?: string; speed?: number; stylePrompt?: string; model?: string; autoSpeak?: boolean }> = [];
 const conversations = new Map<string, Conversation>();
 const roundtables = new Map<string, RoundtableState>();
 const votes = new Map<string, VoteSession>();
@@ -109,6 +111,21 @@ async function loadAgentModelConfigs() {
     const saved = JSON.parse(raw);
     if (Array.isArray(saved)) agentModelConfigs = saved;
   } catch { /* empty */ }
+}
+
+async function loadAgentTTSConfigs() {
+  try {
+    const raw = await readFile(agentTTSFile, "utf8");
+    const saved = JSON.parse(raw);
+    if (Array.isArray(saved)) agentTTSConfigs = saved;
+  } catch { /* empty */ }
+}
+
+async function saveAgentTTSConfigsToDisk() {
+  try {
+    await ensureDataDir();
+    await fsWriteFile(agentTTSFile, JSON.stringify(agentTTSConfigs, null, 2), "utf8");
+  } catch { /* silently fail */ }
 }
 
 async function saveAgentModelConfigsToDisk() {
@@ -579,6 +596,19 @@ export async function createServer() {
         return send(response, 200, { ok: true });
       }
 
+      // ─── Agent TTS Configs ─────────────────────────────
+      if (request.method === "GET" && path === "/api/agent-tts-configs") {
+        return send(response, 200, agentTTSConfigs);
+      }
+      if (request.method === "PUT" && path === "/api/agent-tts-configs") {
+        const body = await readJson(request) as { configs: typeof agentTTSConfigs };
+        if (body.configs) {
+          agentTTSConfigs = body.configs;
+          await saveAgentTTSConfigsToDisk();
+        }
+        return send(response, 200, { ok: true });
+      }
+
       // ─── TTS (MiMo) ───────────────────────────────────
       if (request.method === "POST" && path === "/api/tts") {
         const body = await readJson(request) as {
@@ -589,20 +619,24 @@ export async function createServer() {
           speed?: number;
           providerId?: string;
           model?: string;
+          agentId?: string;
         };
 
         const provider = providers.find((p) => p.id === body.providerId) ??
           providers.find((p) => p.type === "xiaomi-mimo" && p.enabled && p.apiKey);
         if (!provider) return send(response, 400, { error: "No MiMo provider configured with API key" });
 
+        // Merge per-agent TTS config if agentId provided
+        const agentTTS = body.agentId ? agentTTSConfigs.find((c) => c.agentId === body.agentId) : undefined;
+
         try {
           const result = await callMiMoTTS({
             text: body.text,
-            stylePrompt: body.stylePrompt,
-            voice: body.voice ?? provider.ttsVoice ?? "mimo_default",
+            stylePrompt: body.stylePrompt ?? agentTTS?.stylePrompt ?? provider.ttsStylePrompt,
+            voice: body.voice ?? agentTTS?.voice ?? provider.ttsVoice ?? "mimo_default",
             format: (body.format ?? provider.ttsFormat ?? "wav") as "wav" | "mp3" | "pcm16",
-            speed: body.speed ?? provider.ttsSpeed,
-            model: body.model ?? provider.ttsModel ?? "mimo-v2.5-tts",
+            speed: body.speed ?? agentTTS?.speed ?? provider.ttsSpeed,
+            model: body.model ?? agentTTS?.model ?? provider.ttsModel ?? "mimo-v2.5-tts",
             provider,
           });
           return send(response, 200, result);

@@ -1075,3 +1075,69 @@ button.danger:hover { background: rgba(255, 107, 107, 0.2); }
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* ─── Model Selector & TTS Enhancements ──────────────────────── */
+
+.model-selector-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+}
+
+.model-selector-group select {
+  padding: 2px 4px;
+  border: none;
+  font-size: 12px;
+  background: transparent;
+  cursor: pointer;
+  max-width: 150px;
+}
+
+.model-selector-group select:focus {
+  outline: none;
+}
+
+.tts-active {
+  color: var(--primary) !important;
+}
+
+.tts-panel {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+
+.tts-controls {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.tts-controls select,
+.tts-controls input {
+  padding: 2px 4px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  font-size: 11px;
+  background: var(--bg-card);
+}
+
+.tts-controls input {
+  flex: 1;
+  min-width: 100px;
+  padding: 2px 6px;
+}
+
+.msg-model-badge {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-left: 6px;
+  font-weight: 400;
+}

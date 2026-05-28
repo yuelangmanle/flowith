@@ -449,6 +449,18 @@ export interface AgentModelConfig {
   useGlobal?: boolean;  // true = use global default
 }
 
+// ─── Per-Agent TTS Config ──────────────────────────────────────
+
+export interface AgentTTSConfig {
+  agentId: string;
+  enabled: boolean;
+  voice?: string;           // 音色 ID
+  speed?: number;           // 0.5 - 2.0
+  stylePrompt?: string;     // 风格指令
+  model?: string;           // tts model
+  autoSpeak?: boolean;      // 自动朗读 AI 回复
+}
+
 // ─── Docs Research ──────────────────────────────────────────────
 
 export interface DocsResearchResult {
