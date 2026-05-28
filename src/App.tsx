@@ -13,7 +13,7 @@ import { CodeGenView } from "./views/CodeGenView";
 import { ProjectsView } from "./views/ProjectsView";
 import { RightPanel } from "./views/RightPanel";
 import { SkillsView } from "./views/SkillsView";
-import type { AgentTTSConfig, ModelConfig } from "./core/types";
+import type { AgentTTSConfig, ModelConfig, Skill } from "./core/types";
 import { useKeyboard } from "./lib/useKeyboard";
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: string }> {
@@ -38,7 +38,7 @@ export function App() {
   const {
     view, setView, sidebarOpen, toggleSidebar, rightPanelOpen, toggleRightPanel,
     providers, setProviders, models, setModels, conversations,
-    agents, setAgents, setAgentModelConfigs, setAgentTTSConfigs,
+    agents, setAgents, setAgentModelConfigs, setAgentTTSConfigs, setSkills,
     setSelectedAgentId,
     setServerConnected, serverConnected, createConversation, deleteConversation, pinConversation,
     toast, darkMode, toggleDarkMode,
@@ -92,6 +92,12 @@ export function App() {
         // Agent TTS configs
         const atResp = await apiFetch("/api/agent-tts-configs");
         if (atResp.ok) { const d = await atResp.json() as AgentTTSConfig[]; if (Array.isArray(d)) setAgentTTSConfigs(d); }
+      } catch {}
+
+      try {
+        // Skills
+        const sResp = await apiFetch("/api/skills");
+        if (sResp.ok) { const d = await sResp.json() as Skill[]; if (Array.isArray(d)) setSkills(d); }
       } catch {}
 
       try {

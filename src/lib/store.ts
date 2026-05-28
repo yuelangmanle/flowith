@@ -3,7 +3,7 @@ import { createDefaultProviders, getFallbackModels } from "../core/modelGateway"
 import { loadProviders, saveProviders, loadConversations, saveConversation, deleteConversation as deleteConv } from "../core/persistence";
 import { DEFAULT_AGENTS } from "../core/agentConfig";
 import { apiFetch, uid } from "./shared";
-import type { AgentConfig, AgentTTSConfig, ChatMessage, Conversation, ModelConfig, ProviderConfig } from "../core/types";
+import type { AgentConfig, AgentTTSConfig, ChatMessage, Conversation, ModelConfig, ProviderConfig, Skill } from "../core/types";
 
 // ─── Types ─────────────────────────────────────────────────────
 
@@ -88,6 +88,13 @@ interface AppState {
   deleteConversation: (id: string) => void;
   pinConversation: (id: string) => void;
   branchConversation: (convId: string, messageId: string) => Conversation;
+
+  // Skills
+  skills: Skill[];
+  setSkills: (s: Skill[] | ((prev: Skill[]) => Skill[])) => void;
+  installSkill: (skill: Skill) => void;
+  uninstallSkill: (id: string) => void;
+  getInstalledSkills: () => Skill[];
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -237,4 +244,25 @@ export const useStore = create<AppState>((set, get) => ({
     });
     return newConv;
   },
+
+  // Skills
+  skills: [],
+  setSkills: (s) => set({ skills: typeof s === "function" ? s(get().skills) : s }),
+  installSkill: (skill) => {
+    const installed = { ...skill, installed: true, installedAt: new Date().toISOString() };
+    set((prev) => {
+      const exists = prev.skills.find((s) => s.id === skill.id);
+      const next = exists ? prev.skills.map((s) => s.id === skill.id ? installed : s) : [installed, ...prev.skills];
+      try { apiFetch("/api/skills", { method: "PUT", body: JSON.stringify({ skills: next.filter((s) => s.installed) }) }); } catch {}
+      return { skills: next };
+    });
+  },
+  uninstallSkill: (id) => {
+    set((prev) => {
+      const next = prev.skills.map((s) => s.id === id ? { ...s, installed: false } : s);
+      try { apiFetch("/api/skills", { method: "PUT", body: JSON.stringify({ skills: next.filter((s) => s.installed) }) }); } catch {}
+      return { skills: next };
+    });
+  },
+  getInstalledSkills: () => get().skills.filter((s) => s.installed),
 }));

@@ -467,6 +467,29 @@ export interface AgentTTSConfig {
 
 // ─── Docs Research ──────────────────────────────────────────────
 
+
+
+// ─── Skill ──────────────────────────────────────────────────────
+
+export interface Skill {
+  id: string;
+  name: string;
+  nameZh: string;              // 中文名称
+  description: string;         // 英文描述
+  descriptionZh: string;       // 中文描述（必填）
+  author: string;
+  repo?: string;               // GitHub repo URL
+  category: string;
+  categoryZh: string;          // 中文分类
+  stars?: number;
+  installed: boolean;
+  source: "builtin" | "github" | "local";  // 来源
+  localPath?: string;          // 本地导入路径
+  content?: string;            // skill 内容（SKILL.md 或自定义）
+  capabilities?: string[];     // 能力标签，如 ["代码生成", "文档分析"]
+  useCases?: string[];         // 使用场景
+  installedAt?: string;
+}
 export interface DocsResearchResult {
   url: string;
   title: string;

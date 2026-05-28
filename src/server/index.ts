@@ -45,6 +45,7 @@ const agentsFile = resolve(dataDir, "agents.json");
 const agentModelFile = resolve(dataDir, "agent-models.json");
 const agentTTSFile = resolve(dataDir, "agent-tts.json");
 const memoryFile = resolve(dataDir, "memory.json");
+const skillsFile = resolve(dataDir, "skills.json");
 
 // ─── State ──────────────────────────────────────────────────────
 
@@ -57,6 +58,8 @@ const roundtables = new Map<string, RoundtableState>();
 const votes = new Map<string, VoteSession>();
 const codeGenRuns = new Map<string, CodeGenRun>();
 const memory: MemoryStore = createMemoryStore();
+interface InstalledSkill { id: string; name: string; nameZh?: string; description: string; descriptionZh?: string; installed: boolean; capabilities?: string[]; [key: string]: unknown; }
+let installedSkills: InstalledSkill[] = [];
 
 // ─── Persistence ────────────────────────────────────────────────
 
@@ -82,6 +85,12 @@ async function loadFromDisk() {
     const saved = JSON.parse(raw) as AgentConfig[];
     if (Array.isArray(saved) && saved.length > 0) agents = saved;
   } catch { /* use defaults */ }
+
+  try {
+    const raw = await readFile(skillsFile, "utf8");
+    const saved = JSON.parse(raw);
+    if (Array.isArray(saved)) installedSkills = saved;
+  } catch { /* no skills saved yet */ }
 }
 
 async function saveProvidersToDisk() {
@@ -303,6 +312,7 @@ export async function createServer() {
           model?: string;
           imageData?: string;              // base64 data URL
           attachedFiles?: Array<{ name: string; type: string; size: number; content?: string }>;
+          specifiedSkill?: string;         // 用户指定使用的 skill 名称
         };
 
         let conv = conversations.get(body.conversationId);
@@ -340,7 +350,8 @@ export async function createServer() {
 
         try {
           let fullContent = "";
-          for await (const chunk of streamAgentMessage(conv, body.message, agentId, provider, model)) {
+          const skillsForAgent = installedSkills.filter((s) => s.installed).map((s) => ({ nameZh: s.nameZh || s.name, descriptionZh: s.descriptionZh || s.description, capabilities: s.capabilities }));
+          for await (const chunk of streamAgentMessage(conv, body.message, agentId, provider, model, skillsForAgent, body.specifiedSkill)) {
             if (chunk.type === "text" && chunk.content) {
               fullContent += chunk.content;
               sendSSE(response, "text", chunk);
@@ -600,6 +611,121 @@ export async function createServer() {
           await saveAgentModelConfigsToDisk();
         }
         return send(response, 200, { ok: true });
+      }
+
+      
+
+      // ─── Skills ──────────────────────────────────────
+      if (request.method === "GET" && path === "/api/skills") {
+        return send(response, 200, installedSkills);
+      }
+
+      if (request.method === "PUT" && path === "/api/skills") {
+        const body = await readJson(request) as { skills: any[] };
+        installedSkills = body.skills ?? [];
+        await mkdir(dataDir, { recursive: true });
+        await fsWriteFile(skillsFile, JSON.stringify(installedSkills, null, 2));
+        return send(response, 200, { ok: true, count: installedSkills.length });
+      }
+
+      if (request.method === "POST" && path === "/api/skills/install-url") {
+        const body = await readJson(request) as { url: string };
+        try {
+          // Parse GitHub URL
+          const urlMatch = body.url.match(/github\.com\/([^/]+)\/([^/\s]+)/);
+          if (!urlMatch) return send(response, 400, { error: "仅支持 GitHub URL" });
+          const [, owner, repo] = urlMatch;
+          const cleanRepo = repo.replace(/\.git$/, "");
+
+          // Fetch repo info
+          const repoResp = await fetch(`https://api.github.com/repos/${owner}/${cleanRepo}`);
+          const repoData = await repoResp.json() as any;
+
+          // Fetch README for description
+          let readmeContent = "";
+          try {
+            const readmeResp = await fetch(`https://raw.githubusercontent.com/${owner}/${cleanRepo}/main/README.md`);
+            if (readmeResp.ok) readmeContent = await readmeResp.text();
+          } catch {}
+
+          const skill = {
+            id: `github-${owner}-${cleanRepo}`,
+            name: cleanRepo,
+            nameZh: cleanRepo,
+            description: repoData.description || readmeContent.slice(0, 200),
+            descriptionZh: repoData.description || readmeContent.slice(0, 200),
+            author: owner,
+            repo: `https://github.com/${owner}/${cleanRepo}`,
+            category: "Custom",
+            categoryZh: "自定义",
+            stars: repoData.stargazers_count ?? 0,
+            installed: true,
+            source: "github",
+            content: readmeContent.slice(0, 5000),
+            installedAt: new Date().toISOString(),
+          };
+
+          // Add if not exists
+          if (!installedSkills.find((s) => s.id === skill.id)) {
+            installedSkills.push(skill);
+          } else {
+            installedSkills = installedSkills.map((s) => s.id === skill.id ? skill : s);
+          }
+          await mkdir(dataDir, { recursive: true });
+          await fsWriteFile(skillsFile, JSON.stringify(installedSkills, null, 2));
+          return send(response, 200, skill);
+        } catch (err) {
+          return send(response, 500, { error: err instanceof Error ? err.message : "安装失败" });
+        }
+      }
+
+      if (request.method === "POST" && path === "/api/skills/search") {
+        const body = await readJson(request) as { query: string };
+        try {
+          const searchResp = await fetch(`https://api.github.com/search/repositories?q=${encodeURIComponent(body.query + " ai agent skill")}&sort=stars&order=desc&per_page=10`, {
+            headers: { "Accept": "application/vnd.github.v3+json" },
+          });
+          const data = await searchResp.json() as any;
+          const results = (data.items ?? []).map((item: any) => ({
+            id: `github-${item.owner.login}-${item.name}`,
+            name: item.name,
+            nameZh: item.name,
+            description: item.description ?? "",
+            descriptionZh: item.description ?? "",
+            author: item.owner.login,
+            repo: item.html_url,
+            category: "Search",
+            categoryZh: "搜索结果",
+            stars: item.stargazers_count,
+            installed: installedSkills.some((s) => s.id === `github-${item.owner.login}-${item.name}`),
+            source: "github",
+          }));
+          return send(response, 200, results);
+        } catch (err) {
+          return send(response, 500, { error: "搜索失败" });
+        }
+      }
+
+      if (request.method === "POST" && path === "/api/skills/import-local") {
+        const body = await readJson(request) as { name: string; content: string; description?: string };
+        const skill = {
+          id: `local-${Date.now()}`,
+          name: body.name,
+          nameZh: body.name,
+          description: body.description ?? body.content.slice(0, 200),
+          descriptionZh: body.description ?? body.content.slice(0, 200),
+          author: "本地导入",
+          category: "Local",
+          categoryZh: "本地导入",
+          installed: true,
+          source: "local",
+          content: body.content,
+          installedAt: new Date().toISOString(),
+        };
+        installedSkills.push(skill);
+        await mkdir(dataDir, { recursive: true });
+        await fsWriteFile(skillsFile, JSON.stringify(installedSkills, null, 2));
+        return send(response, 200, skill);
       }
 
       // ─── Agent TTS Configs ─────────────────────────────

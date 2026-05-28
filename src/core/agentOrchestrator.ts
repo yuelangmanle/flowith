@@ -242,15 +242,33 @@ export async function* streamAgentMessage(
   userMessage: string,
   agentId: string,
   provider: ProviderConfig,
-  modelId: string
+  modelId: string,
+  installedSkills?: Array<{ nameZh: string; descriptionZh: string; capabilities?: string[] }>,
+  specifiedSkill?: string
 ): AsyncGenerator<StreamChunk> {
   const agent = getAgentById(agentId);
   if (!agent) throw new Error(`Agent not found: ${agentId}`);
 
   const messages: Array<{ role: string; content: string }> = [];
 
-  if (agent.systemPrompt) {
-    messages.push({ role: "system", content: agent.systemPrompt });
+  // Build system prompt with skills awareness
+  let systemPrompt = agent.systemPrompt ?? "";
+
+  if (installedSkills && installedSkills.length > 0) {
+    const skillsContext = installedSkills.map((s) => {
+      const caps = s.capabilities ? ` [${s.capabilities.join(", ")}]` : "";
+      return `- ${s.nameZh}: ${s.descriptionZh}${caps}`;
+    }).join("\n");
+
+    if (specifiedSkill) {
+      systemPrompt += `\n\n【指定技能】用户要求你使用 "${specifiedSkill}" 技能来完成任务。请优先参考该技能的方法论和最佳实践。`;
+    }
+
+    systemPrompt += `\n\n【可用技能】你当前已安装以下技能，在合适的时候可以参考和运用它们的方法论，但不要生搬硬套：\n${skillsContext}\n\n使用原则：\n1. 当任务明显匹配某个技能的使用场景时，自然地运用该技能的方法\n2. 不需要每次都提及技能名称，只需按技能的方法论行事\n3. 如果没有合适的技能，按你自己的专业判断处理\n4. 用户明确指定技能时，优先使用该技能`;
+  }
+
+  if (systemPrompt) {
+    messages.push({ role: "system", content: systemPrompt });
   }
 
   for (const msg of conversation.messages.slice(-30)) {

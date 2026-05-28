@@ -18,6 +18,7 @@ export function ChatView() {
     getEffectiveConfig, createConversation, setView, showToast,
     syncProvidersToServer,
     branchConversation,
+    skills,
   } = store;
 
   const activeConversation = conversations.find((c) => c.id === activeConvId) ?? null;
@@ -34,6 +35,8 @@ export function ChatView() {
   const [attachedFiles, setAttachedFiles] = useState<Array<{ name: string; type: string; size: number; content?: string; base64?: string }>>([]);
   const abortRef = useRef<AbortController | null>(null);
   const [expandedMsgs, setExpandedMsgs] = useState<Set<string>>(new Set());
+  const [specifiedSkill, setSpecifiedSkill] = useState<string>("");
+  const [showSkillPicker, setShowSkillPicker] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatAreaRef = useRef<HTMLDivElement>(null);
 
@@ -312,6 +315,8 @@ export function ChatView() {
     setChatInput("");
     setAttachedImages([]);
     setAttachedFiles([]);
+    setSpecifiedSkill("");
+    setShowSkillPicker(false);
     const controller = new AbortController();
     abortRef.current = controller;
     setStreaming(true);
@@ -331,6 +336,7 @@ export function ChatView() {
         model: cfg.modelId,
         imageData: imageDataList[0] ?? undefined,
         attachedFiles: attachedFiles.length > 0 ? attachedFiles.map((f) => ({ name: f.name, type: f.type, size: f.size, content: f.content })) : undefined,
+        specifiedSkill: specifiedSkill || undefined,
       }),
       });
       if (!resp.ok) { const err = await resp.json() as { error: string }; throw new Error(err.error); }
@@ -565,6 +571,18 @@ export function ChatView() {
                 <button className="icon-btn" onClick={() => setAttachedFiles((prev) => prev.filter((_, idx) => idx !== i))} style={{ fontSize: 10 }}>✕</button>
               </div>
             ))}
+          </div>
+        )}
+        {/* Skill 选择器 */}
+        {showSkillPicker && (
+          <div style={{ marginBottom: 6, padding: 8, borderRadius: 8, background: "var(--bg-card)", border: "1px solid var(--border)" }}>
+            <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>🎯 指定使用技能（可选）：</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+              <button className={`agent-chip ${specifiedSkill === "" ? "selected" : ""}`} onClick={() => setSpecifiedSkill("")} style={{ fontSize: 11, padding: "3px 8px" }}>自动判断</button>
+              {skills.filter((s) => s.installed).map((s) => (
+                <button key={s.id} className={`agent-chip ${specifiedSkill === s.nameZh ? "selected" : ""}`} onClick={() => setSpecifiedSkill(s.nameZh)} style={{ fontSize: 11, padding: "3px 8px" }}>{s.nameZh}</button>
+              ))}
+            </div>
           </div>
         )}
         <div className="chat-input-wrapper" onDrop={handleDrop} onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}>
