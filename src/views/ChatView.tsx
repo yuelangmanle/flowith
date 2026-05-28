@@ -430,8 +430,19 @@ export function ChatView() {
     ? models.filter((m) => m.providerId === selectedProviderId)
     : models.filter((m) => providers.some((p) => p.id === m.providerId && p.enabled));
 
+  // Provider status for debugging
+  const mimoProvider = providers.find((p) => p.type === "xiaomi-mimo");
+  const enabledCount = providers.filter((p) => p.enabled).length;
+
   return (
     <div className="chat-container">
+      {/* Provider status bar */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 16px", background: "var(--bg-card)", borderBottom: "1px solid var(--border)", fontSize: 11, color: "var(--text-muted)", flexShrink: 0 }}>
+        <span>供应商: {providers.length} 个 ({enabledCount} 已启用)</span>
+        {mimoProvider && <span style={{ color: "var(--primary)" }}>✓ MiMo {mimoProvider.enabled ? "已启用" : "未启用"}</span>}
+        {!mimoProvider && <span style={{ color: "var(--accent)" }}>✗ MiMo 未加载</span>}
+        <span style={{ marginLeft: "auto" }}>{getProviderIcon(providers.find((p) => p.id === (agentModelConfigs.find((c) => c.agentId === selectedAgentId && !c.useGlobal)?.providerId ?? selectedProviderId))?.type ?? "")} {models.find((m) => m.id === (agentModelConfigs.find((c) => c.agentId === selectedAgentId && !c.useGlobal)?.modelId ?? selectedModelId))?.id ?? "未选模型"}</span>
+      </div>
       {/* Agent header for 1v1 context */}
       {(() => {
         const currentAgent = agents.find((a) => a.id === selectedAgentId) ?? (selectedAgentId ? null : { id: "", name: "自由对话", avatar: "💬", role: "free" as const, color: "#4ECDC4", goal: "", systemPrompt: "" });
