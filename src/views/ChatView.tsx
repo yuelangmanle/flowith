@@ -68,10 +68,10 @@ export function ChatView() {
     if (!file.type.startsWith("image/")) { showToast("目前仅支持图片上传", "error"); return; }
     try {
       showToast("压缩图片中...", "info");
-      const result = await compressImage(file, { maxDimension: 1024, quality: 0.85, maxBytes: 4 * 1024 * 1024 });
+      const result = await compressImage(file);
       setAttachedImage(result.dataUrl);
-      const ratio = ((1 - result.compressedSize / result.originalSize) * 100).toFixed(0);
-      setImageInfo(`${result.width}x${result.height} · ${formatBytes(result.originalSize)} → ${formatBytes(result.compressedSize)} (压缩${ratio}%)`);
+      const fmt = result.format === "image/webp" ? "WEBP" : "JPEG";
+      setImageInfo(`${result.width}x${result.height} · ${formatBytes(result.originalSize)} → ${formatBytes(result.compressedSize)} (压缩${result.compressionRatio}) · ${fmt} q${(result.quality * 100).toFixed(0)}%`);
     } catch (err) {
       showToast("图片处理失败", "error");
     }
