@@ -26,13 +26,26 @@ function safeSet(key: string, value: unknown): void {
 
 // ─── Providers ──────────────────────────────────────────────────
 
+const PROVIDERS_VERSION = 2; // Bump when adding new default providers
+
 export function loadProviders(): ProviderConfig[] | null {
-  return safeGet<ProviderConfig[] | null>(PROVIDERS_KEY, null);
+  const saved = safeGet<ProviderConfig[] | null>(PROVIDERS_KEY, null);
+  if (!saved) return null;
+  // Check if saved providers are outdated (missing new defaults)
+  const version = safeGet<number>(PROVIDERS_KEY + "-version", 0);
+  if (version < PROVIDERS_VERSION) {
+    // Clear stale cache so store merges with fresh defaults
+    return null;
+  }
+  return saved;
 }
 
 export function saveProviders(providers: ProviderConfig[]): void {
   safeSet(PROVIDERS_KEY, providers);
+  safeSet(PROVIDERS_KEY + "-version", PROVIDERS_VERSION);
 }
+
+
 
 // ─── Conversations ──────────────────────────────────────────────
 
