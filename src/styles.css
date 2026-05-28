@@ -407,6 +407,19 @@ body {
   font-weight: 500;
   border: 1px solid var(--border);
   background: var(--bg-card);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.participant-chip:hover {
+  border-color: var(--primary);
+}
+
+.participant-chip.selected {
+  background: var(--primary-dim);
+  border-color: var(--primary);
+  color: var(--primary-dark);
+  font-weight: 600;
 }
 
 .participant-chip .p-avatar {

@@ -9,7 +9,7 @@ import {
 import { createDefaultProviders, getFallbackModels } from "./core/modelGateway";
 import { loadProviders, saveProviders, loadConversations, saveConversation, deleteConversation as deleteConv } from "./core/persistence";
 import { DEFAULT_AGENTS, createUserAgent } from "./core/agentConfig";
-import type { AgentConfig, ChatMessage, Conversation, ModelConfig, ProviderConfig, VoteSession, StructuredReport } from "./core/types";
+import type { AgentConfig, ChatMessage, Conversation, ModelConfig, ProviderConfig, StructuredReport } from "./core/types";
 import { projectTemplates, appMetadata, roundtableTopics } from "./core/demoData";
 
 const API_BASE = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
@@ -81,8 +81,6 @@ export function App() {
         const resp = await apiFetch("/api/health");
         if (resp.ok) {
           setServerConnected(true);
-          syncProvidersToServer(providers);
-          syncConversationsToServer(conversations);
           // Load agents from server
           try {
             const agentResp = await apiFetch("/api/agents");
@@ -91,19 +89,51 @@ export function App() {
               if (serverAgents.length > 0) setAgents(serverAgents);
             }
           } catch {}
-          // Discover models for enabled providers
-          for (const p of providers.filter((p) => p.enabled && (p.apiKey || p.type === "ollama"))) {
-            try {
-              const resp = await apiFetch("/api/providers/discover", { method: "POST", body: JSON.stringify({ providerId: p.id }) });
-              if (resp.ok) {
-                const data = await resp.json() as { models: ModelConfig[] };
-                setModels((prev) => {
-                  const existing = prev.filter((m) => m.providerId !== p.id);
-                  return [...existing, ...data.models];
+          // Load conversations from server and merge with local
+          try {
+            const convResp = await apiFetch("/api/conversations");
+            if (convResp.ok) {
+              const serverConvs = await convResp.json() as Conversation[];
+              if (serverConvs.length > 0) {
+                setConversations((prev) => {
+                  const serverIds = new Set(serverConvs.map((c) => c.id));
+                  const localOnly = prev.filter((c) => !serverIds.has(c.id));
+                  const merged = [...serverConvs, ...localOnly];
+                  merged.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+                  for (const c of merged) saveConversation(c);
+                  return merged;
                 });
               }
-            } catch {}
-          }
+            }
+          } catch {}
+          // Load providers from server
+          try {
+            const provResp = await apiFetch("/api/providers");
+            if (provResp.ok) {
+              const serverProvs = await provResp.json() as ProviderConfig[];
+              if (serverProvs.length > 0) {
+                setProviders(serverProvs);
+                saveProviders(serverProvs);
+              }
+            }
+          } catch {}
+          // Discover models for enabled providers
+          try {
+            const provResp2 = await apiFetch("/api/providers");
+            const currentProviders = provResp2.ok ? await provResp2.json() as ProviderConfig[] : [];
+            for (const p of currentProviders.filter((pp: ProviderConfig) => pp.enabled && (pp.apiKey || pp.type === "ollama"))) {
+              try {
+                const modelResp = await apiFetch("/api/providers/discover", { method: "POST", body: JSON.stringify({ providerId: p.id }) });
+                if (modelResp.ok) {
+                  const data = await modelResp.json() as { models: ModelConfig[] };
+                  setModels((prev) => {
+                    const existing = prev.filter((m) => m.providerId !== p.id);
+                    return [...existing, ...data.models];
+                  });
+                }
+              } catch {}
+            }
+          } catch {}
         }
       } catch { setServerConnected(false); }
     };
@@ -152,9 +182,13 @@ export function App() {
     const userMsg: ChatMessage = { id: uid(), role: "user", content: message, createdAt: new Date().toISOString() };
     const updatedMessages = [...conv.messages, userMsg];
     const updatedConv = { ...conv, messages: updatedMessages, updatedAt: new Date().toISOString() };
-    const updatedConvs = conversations.map((c) => c.id === conv!.id ? updatedConv : c);
-    setConversations(updatedConvs);
-    saveConversation(updatedConv);
+    setConversations((prev) => {
+      const idx = prev.findIndex((c) => c.id === updatedConv.id);
+      const next = idx >= 0 ? prev.map((c) => c.id === updatedConv.id ? updatedConv : c) : [updatedConv, ...prev];
+      saveConversation(updatedConv);
+      syncConversationsToServer(next);
+      return next;
+    });
 
     setChatInput("");
     setStreaming(true);
@@ -220,10 +254,12 @@ export function App() {
       };
       const finalMessages = [...updatedMessages, assistantMsg];
       const finalConv = { ...updatedConv, messages: finalMessages, updatedAt: new Date().toISOString() };
-      const finalConvs = conversations.map((c) => c.id === conv!.id ? finalConv : c);
-      setConversations(finalConvs);
-      saveConversation(finalConv);
-      syncConversationsToServer(finalConvs);
+      setConversations((prev) => {
+        const next = prev.map((c) => c.id === finalConv.id ? finalConv : c);
+        saveConversation(finalConv);
+        syncConversationsToServer(next);
+        return next;
+      });
     } catch (err) {
       const errorMsg: ChatMessage = {
         id: uid(), role: "system", content: `错误: ${err instanceof Error ? err.message : String(err)}`,
@@ -231,9 +267,11 @@ export function App() {
       };
       const finalMessages = [...updatedMessages, errorMsg];
       const finalConv = { ...updatedConv, messages: finalMessages, updatedAt: new Date().toISOString() };
-      const finalConvs = conversations.map((c) => c.id === conv!.id ? finalConv : c);
-      setConversations(finalConvs);
-      saveConversation(finalConv);
+      setConversations((prev) => {
+        const next = prev.map((c) => c.id === finalConv.id ? finalConv : c);
+        saveConversation(finalConv);
+        return next;
+      });
     } finally {
       setStreaming(false);
       setStreamingContent("");
@@ -310,7 +348,7 @@ export function App() {
           </button>
         </div>
         <div className="agent-selector" style={{ marginTop: 8 }}>
-          {agents.filter((a) => !a.custom || true).map((a) => (
+          {agents.map((a) => (
             <button key={a.id} className={`agent-chip ${selectedAgentId === a.id ? "selected" : ""}`} onClick={() => setSelectedAgentId(a.id)}>
               <span>{a.avatar}</span> {a.name}
             </button>
