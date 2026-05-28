@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Copy, ExternalLink, Loader2, Play, RefreshCw, Search, Send, Square, Volume2, VolumeX } from "lucide-react";
+import { Copy, ExternalLink, Image, Loader2, Play, RefreshCw, Search, Send, Square, Volume2, VolumeX } from "lucide-react";
 import { useStore } from "../lib/store";
 import { apiFetch, formatTime, getProviderIcon, uid } from "../lib/shared";
 import { saveProviders } from "../core/persistence";
@@ -27,6 +27,8 @@ export function ChatView() {
   const lastSpokenMsgRef = useRef<string>("");
   const [continuousTts, setContinuousTts] = useState(false);
   const continuousTtsRef = useRef(false);
+  const [attachedImage, setAttachedImage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-select first provider+model
   useEffect(() => {
@@ -58,6 +60,16 @@ export function ChatView() {
       speakText(lastMsg.content, lastMsg.agentId);
     }
   }, [activeConversation?.messages, ttsEnabled, agentTTSConfigs]); // eslint-disable-line
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { showToast("目前仅支持图片上传", "error"); return; }
+    if (file.size > 10 * 1024 * 1024) { showToast("文件大小不能超过 10MB", "error"); return; }
+    const reader = new FileReader();
+    reader.onload = () => setAttachedImage(reader.result as string);
+    reader.readAsDataURL(file);
+  };
 
   const renderCitations = (content: string) => {
     // Extract URLs from content that look like citations
@@ -139,11 +151,13 @@ export function ChatView() {
   }, []);
 
   const sendChatMessage = useCallback(async (message: string) => {
-    if (!message.trim() || streaming) return;
+    if (!message.trim() && !attachedImage) return;
+    const imagePrefix = attachedImage ? `[图片已附加] ` : "";
+    const fullMessage = imagePrefix + message;
     let conv = activeConversation;
     if (!conv) conv = createConversation("chat", message.slice(0, 30));
 
-    const userMsg: ChatMessage = { id: uid(), role: "user", content: message, createdAt: new Date().toISOString() };
+    const userMsg: ChatMessage = { id: uid(), role: "user", content: fullMessage, createdAt: new Date().toISOString() };
     const updatedMessages = [...conv.messages, userMsg];
     const updatedConv = { ...conv, messages: updatedMessages, updatedAt: new Date().toISOString() };
     setConversations((prev) => {
@@ -154,6 +168,7 @@ export function ChatView() {
     });
 
     setChatInput("");
+    setAttachedImage(null);
     setStreaming(true);
     setStreamingContent("");
     setStreamingAgent(null);
@@ -162,7 +177,7 @@ export function ChatView() {
       const cfg = getEffectiveConfig(selectedAgentId);
       const resp = await apiFetch("/api/chat", {
         method: "POST",
-        body: JSON.stringify({ conversationId: conv.id, message, agentId: selectedAgentId, providerId: cfg.providerId, model: cfg.modelId }),
+        body: JSON.stringify({ conversationId: conv.id, message: fullMessage, agentId: selectedAgentId, providerId: cfg.providerId, model: cfg.modelId }),
       });
       if (!resp.ok) { const err = await resp.json() as { error: string }; throw new Error(err.error); }
 
@@ -310,9 +325,20 @@ export function ChatView() {
         <div ref={messagesEndRef} />
       </div>
       <div className="chat-input-area">
+        {attachedImage && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, padding: 8, borderRadius: 8, background: "var(--bg-card)", border: "1px solid var(--border)" }}>
+            <img src={attachedImage} alt="预览" style={{ maxWidth: 80, maxHeight: 60, borderRadius: 4, objectFit: "cover" }} />
+            <span style={{ fontSize: 12, color: "var(--text-muted)" }}>已附加图片</span>
+            <button className="icon-btn" onClick={() => setAttachedImage(null)} style={{ fontSize: 11 }}>✕</button>
+          </div>
+        )}
         <div className="chat-input-wrapper">
+          <input type="file" ref={fileInputRef} accept="image/*" onChange={handleFileSelect} style={{ display: "none" }} />
+          <button className="icon-btn" onClick={() => fileInputRef.current?.click()} title="附加图片" style={{ color: "var(--text-muted)", flexShrink: 0 }}>
+            <Image size={16} />
+          </button>
           <textarea className="chat-input" placeholder={`与 ${agents.find((a) => a.id === selectedAgentId)?.name ?? "Agent"} 对话...`} value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChatMessage(chatInput); } }} rows={1} disabled={streaming} />
-          <button className="primary" onClick={() => sendChatMessage(chatInput)} disabled={streaming || !chatInput.trim()} style={{ borderRadius: 10, padding: "10px 16px" }}>
+          <button className="primary" onClick={() => sendChatMessage(chatInput)} disabled={streaming || (!chatInput.trim() && !attachedImage)} style={{ borderRadius: 10, padding: "10px 16px" }}>
             {streaming ? <Loader2 size={16} className="spin" /> : <Send size={16} />}
           </button>
         </div>
