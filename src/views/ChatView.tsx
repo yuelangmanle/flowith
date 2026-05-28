@@ -3,6 +3,7 @@ import { Copy, ExternalLink, Image, Loader2, Play, RefreshCw, Search, Send, Squa
 import { useStore } from "../lib/store";
 import { apiFetch, formatTime, getProviderIcon, uid } from "../lib/shared";
 import { saveProviders, saveConversation } from "../core/persistence";
+import { compressImage, formatBytes } from "../lib/imageCompress";
 import type { ChatMessage } from "../core/types";
 
 export function ChatView() {
@@ -60,14 +61,20 @@ export function ChatView() {
     }
   }, [activeConversation?.messages, ttsEnabled, agentTTSConfigs]); // eslint-disable-line
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const [imageInfo, setImageInfo] = useState<string>("");
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) { showToast("目前仅支持图片上传", "error"); return; }
-    if (file.size > 10 * 1024 * 1024) { showToast("文件大小不能超过 10MB", "error"); return; }
-    const reader = new FileReader();
-    reader.onload = () => setAttachedImage(reader.result as string);
-    reader.readAsDataURL(file);
+    try {
+      showToast("压缩图片中...", "info");
+      const result = await compressImage(file, { maxDimension: 1024, quality: 0.85, maxBytes: 4 * 1024 * 1024 });
+      setAttachedImage(result.dataUrl);
+      const ratio = ((1 - result.compressedSize / result.originalSize) * 100).toFixed(0);
+      setImageInfo(`${result.width}x${result.height} · ${formatBytes(result.originalSize)} → ${formatBytes(result.compressedSize)} (压缩${ratio}%)`);
+    } catch (err) {
+      showToast("图片处理失败", "error");
+    }
     e.target.value = "";
   };
 
@@ -352,8 +359,8 @@ export function ChatView() {
         {attachedImage && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, padding: 8, borderRadius: 8, background: "var(--bg-card)", border: "1px solid var(--border)" }}>
             <img src={attachedImage} alt="预览" style={{ maxWidth: 80, maxHeight: 60, borderRadius: 4, objectFit: "cover" }} />
-            <span style={{ fontSize: 12, color: "var(--text-muted)" }}>已附加图片</span>
-            <button className="icon-btn" onClick={() => setAttachedImage(null)} style={{ fontSize: 11 }}>✕</button>
+            <div><span style={{ fontSize: 12, color: "var(--text-muted)" }}>已附加图片</span>{imageInfo && <span style={{ fontSize: 10, color: "var(--text-muted)", display: "block" }}>{imageInfo}</span>}</div>
+            <button className="icon-btn" onClick={() => { setAttachedImage(null); setImageInfo(""); }} style={{ fontSize: 11 }}>✕</button>
           </div>
         )}
         <div className="chat-input-wrapper">
