@@ -71,7 +71,17 @@ async function loadFromDisk() {
   try {
     const raw = await readFile(providersFile, "utf8");
     const saved = JSON.parse(raw) as ProviderConfig[];
-    if (Array.isArray(saved) && saved.length > 0) providers = saved;
+    if (Array.isArray(saved) && saved.length > 0) {
+      // Merge: keep saved settings, but include any new default providers
+      const defaults = createDefaultProviders();
+      const merged = [...saved];
+      for (const def of defaults) {
+        if (!merged.find((p) => p.id === def.id)) {
+          merged.push(def);
+        }
+      }
+      providers = merged;
+    }
   } catch { /* use defaults */ }
 
   try {
