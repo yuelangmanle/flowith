@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Loader2, Send, Users } from "lucide-react";
 import { useStore } from "../lib/store";
-import { apiFetch, uid } from "../lib/shared";
+import { apiFetch } from "../lib/shared";
 
 export function RoundtableView() {
   const { agents, getEffectiveConfig, createConversation } = useStore();
@@ -13,7 +13,7 @@ export function RoundtableView() {
   const [report, setReport] = useState<StructuredReport | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+  useEffect(() => { endRef.current?.scrollIntoView?.({ behavior: "smooth" }); }, [messages]);
 
   type StructuredReport = { title: string; sections: Array<{ heading: string; content: string }>; conclusion: string };
 
