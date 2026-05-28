@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Download, ExternalLink, FileUp, Globe, Loader2, Package, Search, Star, Trash2, Upload, X } from "lucide-react";
+import { Download, ExternalLink, FileUp, Globe, Loader2, Package, RefreshCw, Search, Star, Trash2, Upload, X } from "lucide-react";
 import { useStore } from "../lib/store";
 import { apiFetch, uid } from "../lib/shared";
 import type { Skill } from "../core/types";
@@ -221,6 +221,7 @@ export function SkillsView() {
   const [searchResults, setSearchResults] = useState<Skill[]>([]);
   const [searching, setSearching] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Initialize with built-in skills + installed from server
@@ -291,6 +292,27 @@ export function SkillsView() {
       showToast("搜索失败，请检查网络", "error");
     }
     setSearching(false);
+  };
+
+  const refreshStars = async () => {
+    setRefreshing(true);
+    try {
+      const resp = await apiFetch("/api/skills/refresh-stars", { method: "POST" });
+      if (resp.ok) {
+        const sResp = await apiFetch("/api/skills");
+        if (sResp.ok) {
+          const serverSkills = await sResp.json() as Skill[];
+          setSkills((prev) => prev.map((s) => {
+            const updated = serverSkills.find((ss) => ss.id === s.id);
+            return updated ? { ...s, stars: updated.stars } : s;
+          }));
+        }
+        showToast("星标数已刷新", "success");
+      }
+    } catch {
+      showToast("刷新失败", "error");
+    }
+    setRefreshing(false);
   };
 
   const handleLocalImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -417,6 +439,9 @@ export function SkillsView() {
         <select value={category} onChange={(e) => setCategory(e.target.value)} style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-card)", fontSize: 13, color: "var(--text)" }}>
           {CATEGORIES_ZH.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
         </select>
+        <button className="icon-btn" onClick={refreshStars} disabled={refreshing} title="刷新星标数" style={{ padding: "6px 8px", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text-muted)" }}>
+          {refreshing ? <Loader2 size={14} className="spin" /> : <RefreshCw size={14} />}
+        </button>
       </div>
 
       {/* Skills 网格 */}

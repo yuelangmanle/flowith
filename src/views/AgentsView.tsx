@@ -5,7 +5,7 @@ import { apiFetch, getProviderIcon } from "../lib/shared";
 import type { AgentConfig, AgentTTSConfig } from "../core/types";
 
 export function AgentsView() {
-  const { agents, setAgents, providers, models, agentModelConfigs, setAgentModelConfigs, agentTTSConfigs, setAgentTTSConfigs, ttsPlaying, showToast } = useStore();
+  const { agents, setAgents, providers, models, selectedProviderId, selectedModelId, agentModelConfigs, setAgentModelConfigs, agentTTSConfigs, setAgentTTSConfigs, ttsPlaying, showToast } = useStore();
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
   const [newRole, setNewRole] = useState<AgentConfig["role"]>("coder");
@@ -63,7 +63,9 @@ export function AgentsView() {
       )}
       {agents.map((a) => {
         const agentCfg = agentModelConfigs.find((c) => c.agentId === a.id && !c.useGlobal);
-        const effectiveModel = agentCfg?.modelId ?? "全局默认";
+        const globalProv = providers.find((p) => p.id === selectedProviderId);
+        const globalModel = models.find((m) => m.id === selectedModelId);
+        const effectiveModel = agentCfg?.modelId ?? (globalModel ? `${globalProv?.name ?? ""} / ${globalModel.id}` : "未设置");
         return (
           <div key={a.id} className="agent-card" style={{ marginBottom: 6, flexDirection: "column", alignItems: "stretch" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

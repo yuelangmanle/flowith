@@ -58,7 +58,7 @@ const roundtables = new Map<string, RoundtableState>();
 const votes = new Map<string, VoteSession>();
 const codeGenRuns = new Map<string, CodeGenRun>();
 const memory: MemoryStore = createMemoryStore();
-interface InstalledSkill { id: string; name: string; nameZh?: string; description: string; descriptionZh?: string; installed: boolean; capabilities?: string[]; [key: string]: unknown; }
+interface InstalledSkill { id: string; name: string; nameZh?: string; description: string; descriptionZh?: string; installed: boolean; capabilities?: string[]; repo?: string; source?: string; stars?: number; [key: string]: unknown; }
 let installedSkills: InstalledSkill[] = [];
 
 // ─── Persistence ────────────────────────────────────────────────
@@ -618,6 +618,34 @@ export async function createServer() {
       
 
       // ─── Skills ──────────────────────────────────────
+      
+      if (request.method === "POST" && path === "/api/skills/refresh-stars") {
+        try {
+          const updated = await Promise.all(installedSkills.map(async (skill) => {
+            if (!skill.repo || skill.source === "local") return skill;
+            const urlMatch = skill.repo.match(/github\.com\/([^/]+)\/([^/\s]+)/);
+            if (!urlMatch) return skill;
+            const [, owner, repo] = urlMatch;
+            try {
+              const resp = await fetch(`https://api.github.com/repos/${owner}/${repo.replace(/\.git$/, "")}`, {
+                headers: { "Accept": "application/vnd.github.v3+json" },
+              });
+              if (resp.ok) {
+                const data = await resp.json();
+                return { ...skill, stars: data.stargazers_count ?? skill.stars };
+              }
+            } catch {}
+            return skill;
+          }));
+          installedSkills = updated;
+          await mkdir(dataDir, { recursive: true });
+          await fsWriteFile(skillsFile, JSON.stringify(installedSkills, null, 2));
+          return send(response, 200, { ok: true, count: updated.length });
+        } catch (err) {
+          return send(response, 500, { error: "刷新失败" });
+        }
+      }
+
       if (request.method === "GET" && path === "/api/skills") {
         return send(response, 200, installedSkills);
       }
@@ -684,7 +712,7 @@ export async function createServer() {
       if (request.method === "POST" && path === "/api/skills/search") {
         const body = await readJson(request) as { query: string };
         try {
-          const searchResp = await fetch(`https://api.github.com/search/repositories?q=${encodeURIComponent(body.query + " ai agent skill")}&sort=stars&order=desc&per_page=10`, {
+          const searchResp = await fetch(`https://api.github.com/search/repositories?q=${encodeURIComponent(body.query)}&sort=stars&order=desc&per_page=20`, {
             headers: { "Accept": "application/vnd.github.v3+json" },
           });
           const data = await searchResp.json() as any;

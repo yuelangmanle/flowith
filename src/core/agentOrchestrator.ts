@@ -247,12 +247,12 @@ export async function* streamAgentMessage(
   specifiedSkill?: string
 ): AsyncGenerator<StreamChunk> {
   const agent = getAgentById(agentId);
-  if (!agent) throw new Error(`Agent not found: ${agentId}`);
+  const isFreeChat = !agentId || agentId === "none" || !agent;
 
   const messages: Array<{ role: string; content: string }> = [];
 
   // Build system prompt with skills awareness
-  let systemPrompt = agent.systemPrompt ?? "";
+  let systemPrompt = agent?.systemPrompt ?? "你是一个有用的 AI 助手。请用中文回答用户的问题，保持简洁专业。";
 
   if (installedSkills && installedSkills.length > 0) {
     const skillsContext = installedSkills.slice(0, 15).map((s) => {
@@ -283,10 +283,10 @@ export async function* streamAgentMessage(
   yield {
     type: "text",
     content: "",
-    agentId: agent.id,
-    agentName: agent.name,
-    agentColor: agent.color,
-    agentAvatar: agent.avatar,
+    agentId: agent?.id ?? "free-chat",
+    agentName: agent?.name ?? "AI 助手",
+    agentColor: agent?.color ?? "#4ECDC4",
+    agentAvatar: agent?.avatar ?? "🤖",
   };
 
   yield* streamChatCompletion({ provider, model: modelId, messages, stream: true });

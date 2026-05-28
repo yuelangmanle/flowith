@@ -434,7 +434,7 @@ export function ChatView() {
     <div className="chat-container">
       {/* Agent header for 1v1 context */}
       {(() => {
-        const currentAgent = agents.find((a) => a.id === selectedAgentId);
+        const currentAgent = agents.find((a) => a.id === selectedAgentId) ?? (selectedAgentId ? null : { id: "", name: "自由对话", avatar: "💬", role: "free" as const, color: "#4ECDC4", goal: "", systemPrompt: "" });
         if (!currentAgent) return null;
         return (
           <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 16px", borderBottom: "1px solid var(--border)", background: "var(--bg-card)" }}>
@@ -603,7 +603,7 @@ export function ChatView() {
           <button className="icon-btn" onClick={() => fileInputRef.current?.click()} title="附加文件 (图片/PDF/Excel/Word/ZIP)" style={{ color: "var(--text-muted)", flexShrink: 0 }}>
             <Image size={16} />
           </button>
-          <textarea className="chat-input" placeholder={`与 ${agents.find((a) => a.id === selectedAgentId)?.name ?? "Agent"} 对话...`} value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChatMessage(chatInput); } }} onPaste={handlePaste} rows={1} disabled={streaming} />
+          <textarea className="chat-input" placeholder={selectedAgentId ? `与 ${agents.find((a) => a.id === selectedAgentId)?.name ?? "Agent"} 对话...` : "自由对话..."} value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChatMessage(chatInput); } }} onPaste={handlePaste} rows={1} disabled={streaming} />
           {streaming ? (
             <button className="primary" onClick={() => { abortRef.current?.abort(); setStreaming(false); setStreamingContent(""); setStreamingAgent(null); }} style={{ borderRadius: 10, padding: "10px 16px", background: "var(--accent)" }}>
               <StopCircle size={16} />
