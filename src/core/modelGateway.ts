@@ -84,8 +84,8 @@ export function getFallbackModels(provider: ProviderConfig): ModelConfig[] {
     anthropic: ["claude-sonnet-4-20250514", "claude-haiku-4-20250514"],
     gemini: ["gemini-2.5-pro", "gemini-2.5-flash"],
     deepseek: ["deepseek-chat", "deepseek-reasoner"],
-    qwen: ["qwen-plus", "qwen-max", "qwen-turbo", "text-embedding-v4"],
-    moonshot: ["kimi-k2", "moonshot-v1-32k"],
+    qwen: ["qwen-plus", "qwen-max", "qwen-turbo", "qwen3-235b-a22b", "qwen-vl-max", "text-embedding-v4"],
+    moonshot: ["kimi-k2", "moonshot-v1-128k", "moonshot-v1-32k"],
     ollama: ["llama3.2:latest", "qwen2.5-coder:latest"],
     "xiaomi-mimo": ["mimo-v2.5-pro", "mimo-v2.5", "mimo-v2-flash", "mimo-v2.5-tts"],
     "openai-compatible": ["local-model", "openai-compatible-chat"],
@@ -159,6 +159,11 @@ export async function callChatCompletion(
     stream: false,
   };
 
+  // DeepSeek: reasoning models work best with temperature=0 (or omit)
+  if (provider.type === "deepseek" && model.includes("reasoner")) {
+    bodyObj.temperature = 0;
+  }
+
   // MiMo: inject web search tools when enabled
   if (provider.type === "xiaomi-mimo") {
     bodyObj.thinking = { type: "disabled" };
@@ -224,6 +229,11 @@ export async function* streamChatCompletion(
     max_tokens: req.maxTokens ?? 4096,
     stream: true,
   };
+
+  // DeepSeek: reasoning models work best with temperature=0
+  if (provider.type === "deepseek" && req.model.includes("reasoner")) {
+    streamBodyObj.temperature = 0;
+  }
 
   // MiMo: inject web search tools when enabled
   if (provider.type === "xiaomi-mimo") {
@@ -561,13 +571,15 @@ export function inferCapabilities(provider: ProviderConfig, id: string): ModelCa
       lower.includes("sonnet") ||
       lower.includes("gpt") ||
       lower.includes("o3") ||
+      lower.includes("k2") ||
+      lower.includes("qwen3") ||
       (isMimo && (lower.includes("pro") || lower.includes("flash"))),
     local,
     fast: lower.includes("mini") || lower.includes("flash") || lower.includes("haiku") || lower.includes("turbo") || (isMimo && lower.includes("flash")),
     cheap:
       lower.includes("mini") || lower.includes("flash") || lower.includes("haiku") || lower.includes("turbo") || local,
     largeContext:
-      lower.includes("32k") || lower.includes("128k") || lower.includes("gemini") || lower.includes("sonnet") || (isMimo && (lower.includes("pro") || lower.includes("omni") || lower === "mimo-v2.5")),
+      lower.includes("32k") || lower.includes("128k") || lower.includes("gemini") || lower.includes("sonnet") || lower.includes("k2") || (isMimo && (lower.includes("pro") || lower.includes("omni") || lower === "mimo-v2.5")),
   };
 }
 
