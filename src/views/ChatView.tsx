@@ -2,8 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Copy, ExternalLink, Image, Loader2, Play, RefreshCw, Search, Send, Square, Volume2, VolumeX } from "lucide-react";
 import { useStore } from "../lib/store";
 import { apiFetch, formatTime, getProviderIcon, uid } from "../lib/shared";
-import { saveProviders } from "../core/persistence";
-import { saveConversation } from "../core/persistence";
+import { saveProviders, saveConversation } from "../core/persistence";
 import type { ChatMessage } from "../core/types";
 
 export function ChatView() {
@@ -69,6 +68,7 @@ export function ChatView() {
     const reader = new FileReader();
     reader.onload = () => setAttachedImage(reader.result as string);
     reader.readAsDataURL(file);
+    e.target.value = "";
   };
 
   const renderCitations = (content: string) => {
@@ -229,7 +229,7 @@ export function ChatView() {
       setStreamingContent("");
       setStreamingAgent(null);
     }
-  }, [activeConversation, streaming, selectedAgentId, agents, getEffectiveConfig, createConversation, setConversations]);
+  }, [activeConversation, streaming, selectedAgentId, agents, attachedImage, getEffectiveConfig, createConversation, setConversations, showToast]);
 
   const hasConfiguredProvider = providers.some((p) => p.enabled && (p.apiKey || p.type === "ollama"));
   const availableModels = selectedProviderId
@@ -238,6 +238,27 @@ export function ChatView() {
 
   return (
     <div className="chat-container">
+      {/* Agent header for 1v1 context */}
+      {(() => {
+        const currentAgent = agents.find((a) => a.id === selectedAgentId);
+        if (!currentAgent) return null;
+        return (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 16px", borderBottom: "1px solid var(--border)", background: "var(--bg-card)" }}>
+            <div style={{ width: 32, height: 32, borderRadius: "50%", background: currentAgent.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>{currentAgent.avatar}</div>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 13 }}>{currentAgent.name}</div>
+              <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{currentAgent.role} · {currentAgent.goal?.slice(0, 50) || currentAgent.systemPrompt?.slice(0, 50)}</div>
+            </div>
+            <div style={{ flex: 1 }} />
+            {(() => {
+              const cfg = getEffectiveConfig(selectedAgentId);
+              const provider = cfg.provider;
+              if (!cfg.modelId) return null;
+              return <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{getProviderIcon(provider?.type ?? "")} {cfg.modelId}</span>;
+            })()}
+          </div>
+        );
+      })()}
       <div className="chat-messages">
         {(!activeConversation || activeConversation.messages.length === 0) && (
           <div className="empty-state">
@@ -289,7 +310,10 @@ export function ChatView() {
                     <button className="icon-btn" onClick={() => {
                       const msgIdx = activeConversation?.messages.findIndex((m) => m.id === msg.id);
                       const prevUserMsg = msgIdx && activeConversation ? activeConversation.messages.slice(0, msgIdx).reverse().find((m) => m.role === "user") : null;
-                      if (prevUserMsg) sendChatMessage(prevUserMsg.content);
+                      if (prevUserMsg) {
+                        // Send without image prefix (raw content)
+                        setChatInput(prevUserMsg.content);
+                      }
                     }} title="重新生成" style={{ fontSize: 11, padding: "2px 4px", display: "inline-flex", alignItems: "center" }}>
                       <RefreshCw size={12} />
                     </button>

@@ -13,7 +13,6 @@ import { CodeGenView } from "./views/CodeGenView";
 import { ProjectsView } from "./views/ProjectsView";
 import { RightPanel } from "./views/RightPanel";
 import type { AgentTTSConfig, ModelConfig } from "./core/types";
-import { createDefaultProviders } from "./core/modelGateway";
 import { useKeyboard } from "./lib/useKeyboard";
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: string }> {
@@ -39,6 +38,7 @@ export function App() {
     view, setView, sidebarOpen, toggleSidebar, rightPanelOpen, toggleRightPanel,
     providers, setProviders, models, setModels, conversations,
     agents, setAgents, setAgentModelConfigs, setAgentTTSConfigs,
+    setSelectedAgentId,
     setServerConnected, serverConnected, createConversation, deleteConversation,
     toast, darkMode, toggleDarkMode,
   } = store;
@@ -185,6 +185,20 @@ export function App() {
                     <button className="icon-btn" onClick={(e) => { e.stopPropagation(); exportConversation(c); }} title="导出" style={{ padding: "2px 4px" }}><Download size={10} /></button>
                     <button className="delete-btn" onClick={(e) => { e.stopPropagation(); deleteConversation(c.id); }}><Trash2 size={12} /></button>
                   </div>
+                ))}
+              </div>
+              <div className="sidebar-section">快速 1v1 对话</div>
+              <div style={{ padding: "0 8px", display: "flex", flexDirection: "column", gap: 2 }}>
+                {agents.map((a) => (
+                  <button key={a.id} className="nav-item" style={{ justifyContent: "flex-start", gap: 8, fontSize: 12, padding: "5px 8px" }} onClick={() => {
+                    const conv = createConversation("chat", `与${a.name}对话`);
+                    setSelectedAgentId(a.id);
+                    setView("chat");
+                  }}>
+                    <span style={{ fontSize: 14 }}>{a.avatar}</span>
+                    <span style={{ flex: 1, textAlign: "left" }}>{a.name}</span>
+                    <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{a.role}</span>
+                  </button>
                 ))}
               </div>
             </div>
