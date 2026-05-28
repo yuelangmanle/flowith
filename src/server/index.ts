@@ -6,6 +6,7 @@ import {
   discoverModels,
   streamChatCompletion,
   getFallbackModels,
+  callMiMoTTS,
 } from "../core/modelGateway";
 import { DEFAULT_AGENTS, createUserAgent, getAgentById } from "../core/agentConfig";
 import {
@@ -40,12 +41,14 @@ const dataDir = resolve(process.cwd(), ".agent-data");
 const providersFile = resolve(dataDir, "providers.json");
 const conversationsFile = resolve(dataDir, "conversations.json");
 const agentsFile = resolve(dataDir, "agents.json");
+const agentModelFile = resolve(dataDir, "agent-models.json");
 const memoryFile = resolve(dataDir, "memory.json");
 
 // ─── State ──────────────────────────────────────────────────────
 
 let providers: ProviderConfig[] = createDefaultProviders();
 let agents: AgentConfig[] = [...DEFAULT_AGENTS];
+let agentModelConfigs: Array<{ agentId: string; providerId: string; modelId: string; useGlobal?: boolean }> = [];
 const conversations = new Map<string, Conversation>();
 const roundtables = new Map<string, RoundtableState>();
 const votes = new Map<string, VoteSession>();
@@ -97,6 +100,21 @@ async function saveAgentsToDisk() {
   try {
     await ensureDataDir();
     await fsWriteFile(agentsFile, JSON.stringify(agents, null, 2), "utf8");
+  } catch { /* silently fail */ }
+}
+
+async function loadAgentModelConfigs() {
+  try {
+    const raw = await readFile(agentModelFile, "utf8");
+    const saved = JSON.parse(raw);
+    if (Array.isArray(saved)) agentModelConfigs = saved;
+  } catch { /* empty */ }
+}
+
+async function saveAgentModelConfigsToDisk() {
+  try {
+    await ensureDataDir();
+    await fsWriteFile(agentModelFile, JSON.stringify(agentModelConfigs, null, 2), "utf8");
   } catch { /* silently fail */ }
 }
 
@@ -546,6 +564,51 @@ export async function createServer() {
         const provider = providers.find((p) => p.id === providerId);
         if (!provider) return send(response, 404, { error: "Provider not found" });
         return send(response, 200, getFallbackModels(provider));
+      }
+
+      // ─── Agent Model Configs ──────────────────────────
+      if (request.method === "GET" && path === "/api/agent-models") {
+        return send(response, 200, agentModelConfigs);
+      }
+      if (request.method === "PUT" && path === "/api/agent-models") {
+        const body = await readJson(request) as { configs: typeof agentModelConfigs };
+        if (body.configs) {
+          agentModelConfigs = body.configs;
+          await saveAgentModelConfigsToDisk();
+        }
+        return send(response, 200, { ok: true });
+      }
+
+      // ─── TTS (MiMo) ───────────────────────────────────
+      if (request.method === "POST" && path === "/api/tts") {
+        const body = await readJson(request) as {
+          text: string;
+          stylePrompt?: string;
+          voice?: string;
+          format?: string;
+          speed?: number;
+          providerId?: string;
+          model?: string;
+        };
+
+        const provider = providers.find((p) => p.id === body.providerId) ??
+          providers.find((p) => p.type === "xiaomi-mimo" && p.enabled && p.apiKey);
+        if (!provider) return send(response, 400, { error: "No MiMo provider configured with API key" });
+
+        try {
+          const result = await callMiMoTTS({
+            text: body.text,
+            stylePrompt: body.stylePrompt,
+            voice: body.voice ?? provider.ttsVoice ?? "mimo_default",
+            format: (body.format ?? provider.ttsFormat ?? "wav") as "wav" | "mp3" | "pcm16",
+            speed: body.speed ?? provider.ttsSpeed,
+            model: body.model ?? provider.ttsModel ?? "mimo-v2.5-tts",
+            provider,
+          });
+          return send(response, 200, result);
+        } catch (err) {
+          return send(response, 500, { error: err instanceof Error ? err.message : String(err) });
+        }
       }
 
       // ─── 404 ─────────────────────────────────────────

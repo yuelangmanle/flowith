@@ -8,7 +8,8 @@ export type ProviderType =
   | "qwen"
   | "moonshot"
   | "ollama"
-  | "openai-compatible";
+  | "openai-compatible"
+  | "xiaomi-mimo";
 
 export interface ProviderConfig {
   id: string;
@@ -22,6 +23,17 @@ export interface ProviderConfig {
   region?: string;
   defaultModel?: string;
   modelsDiscovered?: number;
+  // MiMo-specific
+  altBaseUrl?: string;           // 第二个 URL (e.g. token-plan-cn)
+  webSearchEnabled?: boolean;    // 联网搜索开关
+  webSearchMaxKeyword?: number;  // 最大搜索关键词数
+  // TTS settings
+  ttsEnabled?: boolean;
+  ttsModel?: string;             // mimo-v2.5-tts / mimo-v2.5-tts-voicedesign / mimo-v2.5-tts-voiceclone
+  ttsVoice?: string;             // 内置音色 ID
+  ttsFormat?: "wav" | "mp3" | "pcm16";
+  ttsSpeed?: number;             // 0.5 - 2.0
+  ttsStylePrompt?: string;       // 自然语言风格指令
 }
 
 export interface ModelCapabilities {
@@ -374,6 +386,24 @@ export interface StreamChunk {
   round?: number;
 }
 
+// ─── TTS ────────────────────────────────────────────────────────
+
+export interface TTSRequest {
+  text: string;
+  stylePrompt?: string;       // 自然语言风格描述
+  voice?: string;             // 音色 ID
+  format?: "wav" | "mp3" | "pcm16";
+  speed?: number;
+  providerId?: string;
+  model?: string;             // mimo-v2.5-tts / mimo-v2.5-tts-voicedesign / mimo-v2.5-tts-voiceclone
+}
+
+export interface TTSResponse {
+  audioBase64: string;
+  format: string;
+  duration?: number;
+}
+
 // ─── API Request / Response ─────────────────────────────────────
 
 export interface ChatRequest {
@@ -408,6 +438,15 @@ export interface GroupChatConfig {
   turnOrder: "round-robin" | "random" | "moderator-picks";
   maxTurnsPerAgent?: number;
   topic?: string;
+}
+
+// ─── Agent Model Selection ──────────────────────────────────────
+
+export interface AgentModelConfig {
+  agentId: string;
+  providerId: string;
+  modelId: string;
+  useGlobal?: boolean;  // true = use global default
 }
 
 // ─── Docs Research ──────────────────────────────────────────────

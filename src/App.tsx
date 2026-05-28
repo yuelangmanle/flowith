@@ -69,6 +69,13 @@ export function App() {
   const [streamingAgent, setStreamingAgent] = useState<{ id: string; name: string; color: string; avatar: string } | null>(null);
   const [rightTab, setRightTab] = useState<"agents" | "models" | "info">("agents");
   const [selectedAgentId, setSelectedAgentId] = useState("agent-moderator");
+  const [selectedProviderId, setSelectedProviderId] = useState<string>("");
+  const [selectedModelId, setSelectedModelId] = useState<string>("");
+  const [agentModelConfigs, setAgentModelConfigs] = useState<Array<{ agentId: string; providerId: string; modelId: string; useGlobal?: boolean }>>([]);
+  const [ttsEnabled, setTtsEnabled] = useState(false);
+  const [ttsPlaying, setTtsPlaying] = useState(false);
+  const [ttsVoice, setTtsVoice] = useState("mimo_default");
+  const [ttsStylePrompt, setTtsStylePrompt] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -146,6 +153,15 @@ export function App() {
               }
             }
           } catch {}
+          // Load agent model configs
+          try {
+            const amResp = await apiFetch("/api/agent-models");
+            if (amResp.ok) {
+              const amData = await amResp.json() as typeof agentModelConfigs;
+              if (amData.length > 0) setAgentModelConfigs(amData);
+            }
+          } catch {}
+
           // Discover models for enabled providers
           try {
             const provResp2 = await apiFetch("/api/providers");
@@ -231,7 +247,13 @@ export function App() {
     try {
       const resp = await apiFetch("/api/chat", {
         method: "POST",
-        body: JSON.stringify({ conversationId: conv.id, message, agentId: selectedAgentId }),
+        body: JSON.stringify({
+          conversationId: conv.id,
+          message,
+          agentId: selectedAgentId,
+          providerId: getEffectiveConfig(selectedAgentId).providerId,
+          model: getEffectiveConfig(selectedAgentId).modelId,
+        }),
       });
 
       if (!resp.ok) {
@@ -312,7 +334,80 @@ export function App() {
     }
   }, [activeConversation, conversations, streaming, selectedAgentId, agents, createConversation]);
 
+  // ─── TTS ─────────────────────────────────────────────
+  const speakText = useCallback(async (text: string, agentId?: string) => {
+    if (!ttsEnabled) return;
+    setTtsPlaying(true);
+    try {
+      const resp = await apiFetch("/api/tts", {
+        method: "POST",
+        body: JSON.stringify({
+          text: text.slice(0, 2000),
+          voice: ttsVoice,
+          stylePrompt: ttsStylePrompt || undefined,
+          format: "wav",
+        }),
+      });
+      if (resp.ok) {
+        const data = await resp.json() as { audioBase64: string; format: string };
+        const audioBytes = Uint8Array.from(atob(data.audioBase64), (c) => c.charCodeAt(0));
+        const blob = new Blob([audioBytes], { type: "audio/wav" });
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audio.onended = () => { setTtsPlaying(false); URL.revokeObjectURL(url); };
+        audio.onerror = () => { setTtsPlaying(false); URL.revokeObjectURL(url); };
+        await audio.play();
+      } else {
+        setTtsPlaying(false);
+        const err = await resp.json() as { error: string };
+        showToast(`TTS 失败: ${err.error}`, "error");
+      }
+    } catch (err) {
+      setTtsPlaying(false);
+      showToast(`TTS 错误: ${err instanceof Error ? err.message : String(err)}`, "error");
+    }
+  }, [ttsEnabled, ttsVoice, ttsStylePrompt, showToast]);
+
   // ─── View: Chat ───────────────────────────────────────
+  // Get effective provider+model for an agent (per-agent config or global)
+  const getEffectiveConfig = useCallback((agentId: string) => {
+    const agentConfig = agentModelConfigs.find((c) => c.agentId === agentId && !c.useGlobal);
+    if (agentConfig) {
+      const provider = providers.find((p) => p.id === agentConfig.providerId);
+      return { providerId: agentConfig.providerId, modelId: agentConfig.modelId, provider };
+    }
+    // Fall back to global selection
+    if (selectedProviderId && selectedModelId) {
+      return { providerId: selectedProviderId, modelId: selectedModelId, provider: providers.find((p) => p.id === selectedProviderId) };
+    }
+    // Fall back to first enabled provider with key
+    const fallback = providers.find((p) => p.enabled && (p.apiKey || p.type === "ollama"));
+    if (fallback) {
+      const fallbackModels = models.filter((m) => m.providerId === fallback.id);
+      return { providerId: fallback.id, modelId: fallbackModels[0]?.id ?? fallback.defaultModel ?? "", provider: fallback };
+    }
+    return { providerId: "", modelId: "", provider: undefined };
+  }, [agentModelConfigs, selectedProviderId, selectedModelId, providers, models]);
+
+  // Get available models for the currently selected provider
+  const availableModels = selectedProviderId
+    ? models.filter((m) => m.providerId === selectedProviderId)
+    : models.filter((m) => providers.some((p) => p.id === m.providerId && p.enabled));
+
+  // Auto-select first provider+model if none selected
+  useEffect(() => {
+    if (!selectedProviderId && providers.length > 0) {
+      const enabled = providers.find((p) => p.enabled && (p.apiKey || p.type === "ollama"));
+      if (enabled) {
+        setSelectedProviderId(enabled.id);
+        const provModels = models.filter((m) => m.providerId === enabled.id);
+        if (provModels.length > 0 && !selectedModelId) {
+          setSelectedModelId(provModels[0].id);
+        }
+      }
+    }
+  }, [providers, models, selectedProviderId, selectedModelId]);
+
   const hasConfiguredProvider = providers.some((p) => p.enabled && (p.apiKey || p.type === "ollama"));
   const renderChat = () => (
     <div className="chat-container">
@@ -346,6 +441,11 @@ export function App() {
               <div className="msg-bubble">
                 {msg.agentName && <div className="msg-agent-name" style={{ color: msg.agentColor }}>{msg.agentAvatar} {msg.agentName}</div>}
                 <div style={{ whiteSpace: "pre-wrap" }}>{msg.content}</div>
+                {msg.role === "assistant" && ttsEnabled && (
+                  <button className="icon-btn" style={{ marginTop: 4, fontSize: 12, padding: "2px 6px" }} onClick={() => speakText(msg.content, msg.agentId)} disabled={ttsPlaying}>
+                    {ttsPlaying ? "⏳" : "🔊"}
+                  </button>
+                )}
               </div>
               <div className="msg-time">{formatTime(msg.createdAt)}</div>
             </div>
@@ -389,12 +489,48 @@ export function App() {
             {streaming ? <Loader2 size={16} className="spin" /> : <Send size={16} />}
           </button>
         </div>
-        <div className="agent-selector" style={{ marginTop: 8 }}>
-          {agents.map((a) => (
-            <button key={a.id} className={`agent-chip ${selectedAgentId === a.id ? "selected" : ""}`} onClick={() => setSelectedAgentId(a.id)}>
-              <span>{a.avatar}</span> {a.name}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+          <div className="agent-selector" style={{ flex: 1, margin: 0 }}>
+            {agents.map((a) => (
+              <button key={a.id} className={`agent-chip ${selectedAgentId === a.id ? "selected" : ""}`} onClick={() => setSelectedAgentId(a.id)}>
+                <span>{a.avatar}</span> {a.name}
+              </button>
+            ))}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <select
+              value={selectedProviderId}
+              onChange={(e) => {
+                setSelectedProviderId(e.target.value);
+                const provModels = models.filter((m) => m.providerId === e.target.value);
+                setSelectedModelId(provModels[0]?.id ?? "");
+              }}
+              style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid var(--border)", fontSize: 12, background: "var(--bg-card)", maxWidth: 120 }}
+            >
+              <option value="">全局</option>
+              {providers.filter((p) => p.enabled).map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+            <select
+              value={selectedModelId}
+              onChange={(e) => setSelectedModelId(e.target.value)}
+              style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid var(--border)", fontSize: 12, background: "var(--bg-card)", maxWidth: 160 }}
+            >
+              {availableModels.length === 0 && <option value="">无模型</option>}
+              {availableModels.map((m) => (
+                <option key={m.id} value={m.id}>{m.id}</option>
+              ))}
+            </select>
+            <button
+              className={`icon-btn ${ttsEnabled ? "tts-active" : ""}`}
+              onClick={() => setTtsEnabled(!ttsEnabled)}
+              title={ttsEnabled ? "关闭语音朗读" : "开启语音朗读"}
+              style={{ color: ttsEnabled ? "var(--primary)" : "var(--text-muted)" }}
+            >
+              {ttsEnabled ? "🔊" : "🔇"}
             </button>
-          ))}
+          </div>
         </div>
       </div>
     </div>
@@ -746,7 +882,117 @@ export function App() {
             </div>
             {p.enabled && (
               <div className="p-fields">
-                {p.type !== "ollama" && (
+                {p.type === "xiaomi-mimo" && (
+                  <>
+                    <div className="field-row">
+                      <label>备用 URL</label>
+                      <select
+                        value={p.altBaseUrl ?? ""}
+                        onChange={(e) => {
+                          const updated = { ...p, altBaseUrl: e.target.value || undefined };
+                          const newProviders = providers.map((pp) => pp.id === p.id ? updated : pp);
+                          setProviders(newProviders);
+                          saveProviders(newProviders);
+                          syncProvidersToServer(newProviders);
+                        }}
+                        style={{ flex: 1, padding: "6px 10px", borderRadius: 6, border: "1px solid var(--border)" }}
+                      >
+                        <option value="">默认 ({p.baseUrl})</option>
+                        <option value="https://token-plan-cn.xiaomimimo.com/v1">Token Plan CN</option>
+                      </select>
+                    </div>
+                    <div className="field-row">
+                      <label>联网搜索</label>
+                      <button
+                        className={`toggle-switch ${p.webSearchEnabled ? "on" : ""}`}
+                        onClick={() => {
+                          const updated = { ...p, webSearchEnabled: !p.webSearchEnabled };
+                          const newProviders = providers.map((pp) => pp.id === p.id ? updated : pp);
+                          setProviders(newProviders);
+                          saveProviders(newProviders);
+                          syncProvidersToServer(newProviders);
+                        }}
+                      />
+                    </div>
+                    <div className="field-row">
+                      <label>TTS 语音</label>
+                      <button
+                        className={`toggle-switch ${p.ttsEnabled ? "on" : ""}`}
+                        onClick={() => {
+                          const updated = { ...p, ttsEnabled: !p.ttsEnabled };
+                          const newProviders = providers.map((pp) => pp.id === p.id ? updated : pp);
+                          setProviders(newProviders);
+                          saveProviders(newProviders);
+                          syncProvidersToServer(newProviders);
+                          if (updated.ttsEnabled) setTtsEnabled(true);
+                        }}
+                      />
+                    </div>
+                    {p.ttsEnabled && (
+                      <>
+                        <div className="field-row">
+                          <label>音色</label>
+                          <select
+                            value={p.ttsVoice ?? "mimo_default"}
+                            onChange={(e) => {
+                              const updated = { ...p, ttsVoice: e.target.value };
+                              const newProviders = providers.map((pp) => pp.id === p.id ? updated : pp);
+                              setProviders(newProviders);
+                              saveProviders(newProviders);
+                              setTtsVoice(e.target.value);
+                            }}
+                            style={{ flex: 1, padding: "6px 10px", borderRadius: 6, border: "1px solid var(--border)" }}
+                          >
+                            <option value="mimo_default">默认 (冰糖)</option>
+                            <option value="冰糖">冰糖 (女)</option>
+                            <option value="茉莉">茉莉 (女)</option>
+                            <option value="苏打">苏打 (男)</option>
+                            <option value="白桦">白桦 (男)</option>
+                            <option value="Mia">Mia (EN)</option>
+                          </select>
+                        </div>
+                        <div className="field-row">
+                          <label>TTS 模型</label>
+                          <select
+                            value={p.ttsModel ?? "mimo-v2.5-tts"}
+                            onChange={(e) => {
+                              const updated = { ...p, ttsModel: e.target.value };
+                              const newProviders = providers.map((pp) => pp.id === p.id ? updated : pp);
+                              setProviders(newProviders);
+                              saveProviders(newProviders);
+                            }}
+                            style={{ flex: 1, padding: "6px 10px", borderRadius: 6, border: "1px solid var(--border)" }}
+                          >
+                            <option value="mimo-v2.5-tts">内置音色 (mimo-v2.5-tts)</option>
+                            <option value="mimo-v2.5-tts-voicedesign">音色设计 (voicedesign)</option>
+                            <option value="mimo-v2.5-tts-voiceclone">音色克隆 (voiceclone)</option>
+                          </select>
+                        </div>
+                        <div className="field-row">
+                          <label>风格指令</label>
+                          <input
+                            placeholder="如: 温柔活泼的语调，语速稍快"
+                            value={p.ttsStylePrompt ?? ttsStylePrompt}
+                            onChange={(e) => {
+                              setTtsStylePrompt(e.target.value);
+                              const updated = { ...p, ttsStylePrompt: e.target.value };
+                              const newProviders = providers.map((pp) => pp.id === p.id ? updated : pp);
+                              setProviders(newProviders);
+                              saveProviders(newProviders);
+                            }}
+                          />
+                        </div>
+                        <div className="field-row">
+                          <label>测试 TTS</label>
+                          <button onClick={() => speakText("你好，我是小米 MiMo，很高兴认识你！")}>
+                            🔊 试听
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
+                {p.type !== "ollama" && p.type !== "xiaomi-mimo" && (
                   <div className="field-row">
                     <label>API Key</label>
                     <input
@@ -763,6 +1009,7 @@ export function App() {
                     />
                   </div>
                 )}
+                {p.type !== "xiaomi-mimo" && (
                 <div className="field-row">
                   <label>Base URL</label>
                   <input
@@ -776,6 +1023,7 @@ export function App() {
                     onBlur={() => syncProvidersToServer(providers)}
                   />
                 </div>
+                )}
                 <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
                   <button onClick={async () => {
                     const resp = await apiFetch("/api/providers/test", { method: "POST", body: JSON.stringify({ providerId: p.id }) });
@@ -861,22 +1109,75 @@ export function App() {
           </div>
         </div>
       )}
-      {agents.map((a) => (
-        <div key={a.id} className="agent-card" style={{ marginBottom: 6 }}>
-          <div className="a-avatar" style={{ background: a.color }}>{a.avatar}</div>
-          <div className="a-info">
-            <div className="a-name">{a.name} {a.custom && <span style={{ fontSize: 10, color: "var(--text-muted)" }}>(自定义)</span>}</div>
-            <div className="a-role">{a.role}</div>
-            <div className="a-goal">{a.goal || a.systemPrompt?.slice(0, 60)}</div>
+      {agents.map((a) => {
+        const agentCfg = agentModelConfigs.find((c) => c.agentId === a.id && !c.useGlobal);
+        const effectiveProvider = agentCfg ? providers.find((p) => p.id === agentCfg.providerId) : null;
+        const effectiveModel = agentCfg?.modelId ?? "全局默认";
+        return (
+        <div key={a.id} className="agent-card" style={{ marginBottom: 6, flexDirection: "column", alignItems: "stretch" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div className="a-avatar" style={{ background: a.color }}>{a.avatar}</div>
+            <div className="a-info">
+              <div className="a-name">{a.name} {a.custom && <span style={{ fontSize: 10, color: "var(--text-muted)" }}>(自定义)</span>}</div>
+              <div className="a-role">{a.role}</div>
+              <div className="a-goal">{a.goal || a.systemPrompt?.slice(0, 60)}</div>
+            </div>
+            {a.custom && (
+              <button className="icon-btn" onClick={async () => {
+                await apiFetch(`/api/agents/${a.id}`, { method: "DELETE" });
+                setAgents((prev) => prev.filter((aa) => aa.id !== a.id));
+              }}><Trash2 size={14} /></button>
+            )}
           </div>
-          {a.custom && (
-            <button className="icon-btn" onClick={async () => {
-              await apiFetch(`/api/agents/${a.id}`, { method: "DELETE" });
-              setAgents((prev) => prev.filter((aa) => aa.id !== a.id));
-            }}><Trash2 size={14} /></button>
-          )}
+          <div style={{ display: "flex", gap: 6, marginTop: 6, alignItems: "center" }}>
+            <span style={{ fontSize: 11, color: "var(--text-muted)", minWidth: 50 }}>模型:</span>
+            <select
+              value={agentCfg?.providerId ?? ""}
+              onChange={(e) => {
+                const newProviderId = e.target.value;
+                if (!newProviderId) {
+                  // Use global
+                  const newConfigs = agentModelConfigs.filter((c) => c.agentId !== a.id);
+                  setAgentModelConfigs(newConfigs);
+                  apiFetch("/api/agent-models", { method: "PUT", body: JSON.stringify({ configs: newConfigs }) });
+                } else {
+                  const provModels = models.filter((m) => m.providerId === newProviderId);
+                  const newConfig = { agentId: a.id, providerId: newProviderId, modelId: provModels[0]?.id ?? "" };
+                  const newConfigs = [...agentModelConfigs.filter((c) => c.agentId !== a.id), newConfig];
+                  setAgentModelConfigs(newConfigs);
+                  apiFetch("/api/agent-models", { method: "PUT", body: JSON.stringify({ configs: newConfigs }) });
+                }
+              }}
+              style={{ padding: "3px 6px", borderRadius: 4, border: "1px solid var(--border)", fontSize: 11, background: "var(--bg-card)", maxWidth: 100 }}
+            >
+              <option value="">全局</option>
+              {providers.filter((p) => p.enabled).map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+            <select
+              value={agentCfg?.modelId ?? ""}
+              onChange={(e) => {
+                const newConfigs = agentModelConfigs.map((c) =>
+                  c.agentId === a.id ? { ...c, modelId: e.target.value } : c
+                );
+                setAgentModelConfigs(newConfigs);
+                apiFetch("/api/agent-models", { method: "PUT", body: JSON.stringify({ configs: newConfigs }) });
+              }}
+              style={{ padding: "3px 6px", borderRadius: 4, border: "1px solid var(--border)", fontSize: 11, background: "var(--bg-card)", maxWidth: 140 }}
+            >
+              {!agentCfg && <option value="">{effectiveModel}</option>}
+              {agentCfg && models.filter((m) => m.providerId === agentCfg.providerId).map((m) => (
+                <option key={m.id} value={m.id}>{m.id}</option>
+              ))}
+            </select>
+            {agentCfg && (
+              <span style={{ fontSize: 10, color: "var(--primary)" }}>✓ 自定义</span>
+            )}
+          </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 

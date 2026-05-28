@@ -17,6 +17,7 @@ const providerDefaults: Array<[ProviderType, string, string, boolean]> = [
   ["qwen", "Qwen / DashScope", "https://dashscope.aliyuncs.com/compatible-mode/v1", true],
   ["moonshot", "Moonshot / Kimi", "https://api.moonshot.cn/v1", true],
   ["ollama", "Ollama", "http://localhost:11434", true],
+  ["xiaomi-mimo", "Xiaomi MiMo", "https://api.xiaomimimo.com/v1", true],
   ["openai-compatible", "OpenAI-Compatible", "http://localhost:1234/v1", true],
 ];
 
@@ -86,6 +87,7 @@ export function getFallbackModels(provider: ProviderConfig): ModelConfig[] {
     qwen: ["qwen-plus", "qwen-max", "qwen-turbo", "text-embedding-v4"],
     moonshot: ["kimi-k2", "moonshot-v1-32k"],
     ollama: ["llama3.2:latest", "qwen2.5-coder:latest"],
+    "xiaomi-mimo": ["mimo-v2.5-pro", "mimo-v2.5", "mimo-v2-flash", "mimo-v2.5-tts"],
     "openai-compatible": ["local-model", "openai-compatible-chat"],
   };
   return (candidates[provider.type] ?? []).map((id) => toModel(provider, id));
@@ -119,6 +121,9 @@ export interface ChatCompletionRequest {
   stream?: boolean;
   temperature?: number;
   maxTokens?: number;
+  // MiMo web search
+  enableWebSearch?: boolean;
+  webSearchMaxKeyword?: number;
 }
 
 export async function callChatCompletion(
@@ -503,25 +508,29 @@ export function inferCapabilities(provider: ProviderConfig, id: string): ModelCa
   const lower = id.toLowerCase();
   const embedding = lower.includes("embedding") || lower.includes("embed");
   const local = provider.type === "ollama";
+  const isMimo = provider.type === "xiaomi-mimo";
+  const isMimoTts = lower.includes("tts");
+  const isMimoOmni = lower.includes("omni") || lower === "mimo-v2.5" || lower === "mimo-v2-omni";
   return {
-    chat: !embedding,
-    completion: !embedding,
+    chat: !embedding && !isMimoTts,
+    completion: !embedding && !isMimoTts,
     embedding,
-    vision: lower.includes("vision") || lower.includes("gemini") || lower.includes("gpt-4"),
-    toolCalling: !embedding && !local,
-    jsonMode: !embedding,
+    vision: lower.includes("vision") || lower.includes("gemini") || lower.includes("gpt-4") || isMimoOmni,
+    toolCalling: !embedding && !local && !isMimoTts,
+    jsonMode: !embedding && !isMimoTts,
     reasoning:
       lower.includes("reason") ||
       lower.includes("pro") ||
       lower.includes("sonnet") ||
       lower.includes("gpt") ||
-      lower.includes("o3"),
+      lower.includes("o3") ||
+      (isMimo && (lower.includes("pro") || lower.includes("flash"))),
     local,
-    fast: lower.includes("mini") || lower.includes("flash") || lower.includes("haiku") || lower.includes("turbo"),
+    fast: lower.includes("mini") || lower.includes("flash") || lower.includes("haiku") || lower.includes("turbo") || (isMimo && lower.includes("flash")),
     cheap:
       lower.includes("mini") || lower.includes("flash") || lower.includes("haiku") || lower.includes("turbo") || local,
     largeContext:
-      lower.includes("32k") || lower.includes("128k") || lower.includes("gemini") || lower.includes("sonnet"),
+      lower.includes("32k") || lower.includes("128k") || lower.includes("gemini") || lower.includes("sonnet") || (isMimo && (lower.includes("pro") || lower.includes("omni") || lower === "mimo-v2.5")),
   };
 }
 
@@ -559,4 +568,68 @@ export function getBestModelForTask(
   const provider = providers.find((p) => p.id === model.providerId);
   if (!provider) return null;
   return { provider, model };
+}
+
+
+// ─── MiMo TTS ──────────────────────────────────────────────────
+
+export interface MiMoTTSRequest {
+  text: string;
+  stylePrompt?: string;
+  voice?: string;
+  format?: "wav" | "mp3" | "pcm16";
+  speed?: number;
+  model?: string;
+  provider: ProviderConfig;
+}
+
+export async function callMiMoTTS(
+  req: MiMoTTSRequest,
+  fetcher: typeof fetch = fetch
+): Promise<{ audioBase64: string; format: string }> {
+  const url = `${req.provider.baseUrl.replace(/\/\/$/, "")}/chat/completions`;
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    "api-key": req.provider.apiKey,
+    "Authorization": `Bearer ${req.provider.apiKey}`,
+  };
+
+  const messages: Array<{ role: string; content: string }> = [];
+
+  // style prompt goes in user message
+  if (req.stylePrompt) {
+    messages.push({ role: "user", content: req.stylePrompt });
+  }
+
+  // text to synthesize goes in assistant message
+  messages.push({ role: "assistant", content: req.text });
+
+  const body = JSON.stringify({
+    model: req.model ?? "mimo-v2.5-tts",
+    messages,
+    audio: {
+      format: req.format ?? "wav",
+      voice: req.voice ?? "mimo_default",
+    },
+  });
+
+  const response = await fetcher(url, {
+    method: "POST",
+    headers,
+    body,
+  });
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => "");
+    throw new Error(`MiMo TTS error ${response.status}: ${errText.slice(0, 300)}`);
+  }
+
+  const data = await response.json() as {
+    choices?: Array<{ message?: { audio?: { data?: string } } }>;
+  };
+
+  const audioData = data.choices?.[0]?.message?.audio?.data;
+  if (!audioData) throw new Error("No audio data in TTS response");
+
+  return { audioBase64: audioData, format: req.format ?? "wav" };
 }

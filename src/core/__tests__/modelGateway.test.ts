@@ -18,6 +18,7 @@ describe("model gateway", () => {
       "qwen",
       "moonshot",
       "ollama",
+      "xiaomi-mimo",
       "openai-compatible",
     ]);
     expect(providers.every((provider) => "baseUrl" in provider && "apiKey" in provider)).toBe(true);
