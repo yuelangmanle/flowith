@@ -186,7 +186,7 @@ body {
 
 .sidebar-bottom {
   flex-shrink: 0;
-  max-height: 220px;
+  max-height: 150px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
