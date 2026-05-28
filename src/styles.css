@@ -1141,3 +1141,74 @@ button.danger:hover { background: rgba(255, 107, 107, 0.2); }
   margin-left: 6px;
   font-weight: 400;
 }
+
+/* ─── Dark Mode ──────────────────────────────────────────────── */
+
+[data-theme="dark"] {
+  --bg: #0f1117;
+  --bg-card: #1a1d27;
+  --bg-hover: #252836;
+  --text: #e4e4e7;
+  --text-muted: #8b8fa3;
+  --border: #2d3148;
+  --primary: #4ECDC4;
+  --primary-hover: #3dbdb5;
+  --accent: #FF6B6B;
+  --success: #6BCB77;
+  --warning: #FFD93D;
+  --shadow: rgba(0, 0, 0, 0.3);
+  color-scheme: dark;
+}
+
+[data-theme="dark"] .app-shell {
+  background: var(--bg);
+  color: var(--text);
+}
+
+[data-theme="dark"] .sidebar {
+  background: var(--bg-card);
+  border-color: var(--border);
+}
+
+[data-theme="dark"] .topbar {
+  background: var(--bg-card);
+  border-color: var(--border);
+}
+
+[data-theme="dark"] .msg-bubble {
+  background: var(--bg-card);
+  border-color: var(--border);
+}
+
+[data-theme="dark"] .chat-input {
+  background: var(--bg-card);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+[data-theme="dark"] .provider-card {
+  background: var(--bg-card);
+  border-color: var(--border);
+}
+
+[data-theme="dark"] select,
+[data-theme="dark"] input,
+[data-theme="dark"] textarea {
+  background: var(--bg-card);
+  color: var(--text);
+  border-color: var(--border);
+}
+
+[data-theme="dark"] .right-panel {
+  background: var(--bg-card);
+  border-color: var(--border);
+}
+
+[data-theme="dark"] .conv-item:hover,
+[data-theme="dark"] .nav-item:hover {
+  background: var(--bg-hover);
+}
+
+[data-theme="dark"] .empty-state {
+  color: var(--text-muted);
+}

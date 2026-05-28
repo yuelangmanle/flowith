@@ -14,6 +14,7 @@ import { ProjectsView } from "./views/ProjectsView";
 import { RightPanel } from "./views/RightPanel";
 import type { AgentTTSConfig, ModelConfig } from "./core/types";
 import { createDefaultProviders } from "./core/modelGateway";
+import { useKeyboard } from "./lib/useKeyboard";
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: string }> {
   state = { hasError: false, error: "" };
@@ -41,6 +42,8 @@ export function App() {
     setServerConnected, serverConnected, createConversation, deleteConversation,
     toast, darkMode, toggleDarkMode,
   } = store;
+
+  useKeyboard();
 
   // Server health + data loading
   useEffect(() => {
