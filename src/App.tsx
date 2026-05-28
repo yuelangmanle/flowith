@@ -307,6 +307,7 @@ export function App() {
       const assistantMsg: ChatMessage = {
         id: uid(), role: "assistant", content: fullContent || "(无响应)",
         agentId: agent?.id, agentName: agent?.name, agentColor: agent?.color,
+        agentAvatar: agent?.avatar,
         createdAt: new Date().toISOString(),
       };
       const finalMessages = [...updatedMessages, assistantMsg];
@@ -334,7 +335,7 @@ export function App() {
       setStreamingContent("");
       setStreamingAgent(null);
     }
-  }, [activeConversation, conversations, streaming, selectedAgentId, agents, createConversation]);
+  }, [activeConversation, conversations, streaming, selectedAgentId, selectedProviderId, selectedModelId, agents, agentModelConfigs, providers, models, createConversation, showToast]);
 
   // ─── TTS ─────────────────────────────────────────────
   const speakText = useCallback(async (text: string, agentId?: string) => {
@@ -379,6 +380,22 @@ export function App() {
       showToast(`TTS 错误: ${err instanceof Error ? err.message : String(err)}`, "error");
     }
   }, [ttsEnabled, ttsVoice, ttsStylePrompt, agentTTSConfigs, showToast]);
+
+  // ─── Auto-speak: read aloud new assistant messages ───
+  useEffect(() => {
+    if (!activeConversation || activeConversation.messages.length === 0) return;
+    const lastMsg = activeConversation.messages[activeConversation.messages.length - 1];
+    if (lastMsg.role !== "assistant" || lastMsg.id === lastSpokenMsgRef.current) return;
+
+    const agentTTS = lastMsg.agentId ? agentTTSConfigs.find((c) => c.agentId === lastMsg.agentId) : null;
+    const shouldSpeak = ttsEnabled || agentTTS?.enabled;
+    const shouldAutoSpeak = agentTTS?.autoSpeak ?? ttsEnabled;
+
+    if (shouldSpeak && shouldAutoSpeak && lastMsg.content && lastMsg.content !== "(无响应)") {
+      lastSpokenMsgRef.current = lastMsg.id;
+      speakText(lastMsg.content, lastMsg.agentId);
+    }
+  }, [activeConversation?.messages, ttsEnabled, agentTTSConfigs, speakText]);
 
   // ─── View: Chat ───────────────────────────────────────
   // Get effective provider+model for an agent (per-agent config or global)
@@ -522,37 +539,91 @@ export function App() {
             ))}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <select
-              value={selectedProviderId}
-              onChange={(e) => {
-                setSelectedProviderId(e.target.value);
-                const provModels = models.filter((m) => m.providerId === e.target.value);
-                setSelectedModelId(provModels[0]?.id ?? "");
-              }}
-              style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid var(--border)", fontSize: 12, background: "var(--bg-card)", maxWidth: 120 }}
-            >
-              <option value="">全局</option>
-              {providers.filter((p) => p.enabled).map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-            <select
-              value={selectedModelId}
-              onChange={(e) => setSelectedModelId(e.target.value)}
-              style={{ padding: "4px 8px", borderRadius: 6, border: "1px solid var(--border)", fontSize: 12, background: "var(--bg-card)", maxWidth: 160 }}
-            >
-              {availableModels.length === 0 && <option value="">无模型</option>}
-              {availableModels.map((m) => (
-                <option key={m.id} value={m.id}>{m.id}</option>
-              ))}
-            </select>
+            <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "3px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg-card)" }}>
+              <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+                {getProviderIcon(providers.find((p) => p.id === (agentModelConfigs.find((c) => c.agentId === selectedAgentId && !c.useGlobal)?.providerId ?? selectedProviderId))?.type ?? "")}
+              </span>
+              <select
+                value={agentModelConfigs.find((c) => c.agentId === selectedAgentId && !c.useGlobal)?.providerId ?? selectedProviderId}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  const existingCfg = agentModelConfigs.find((c) => c.agentId === selectedAgentId && !c.useGlobal);
+                  if (existingCfg) {
+                    const provModels = models.filter((m) => m.providerId === v);
+                    const newConfigs = agentModelConfigs.map((c) =>
+                      c.agentId === selectedAgentId ? { ...c, providerId: v, modelId: provModels[0]?.id ?? "" } : c
+                    );
+                    setAgentModelConfigs(newConfigs);
+                    apiFetch("/api/agent-models", { method: "PUT", body: JSON.stringify({ configs: newConfigs }) });
+                  } else {
+                    setSelectedProviderId(v);
+                    const provModels = models.filter((m) => m.providerId === v);
+                    setSelectedModelId(provModels[0]?.id ?? "");
+                  }
+                }}
+                style={{ padding: "2px 4px", border: "none", fontSize: 12, background: "transparent", maxWidth: 100, cursor: "pointer" }}
+              >
+                <option value="">全局</option>
+                {providers.filter((p) => p.enabled).map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+              <span style={{ fontSize: 10, color: "var(--border)" }}>|</span>
+              <select
+                value={agentModelConfigs.find((c) => c.agentId === selectedAgentId && !c.useGlobal)?.modelId ?? selectedModelId}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  const existingCfg = agentModelConfigs.find((c) => c.agentId === selectedAgentId && !c.useGlobal);
+                  if (existingCfg) {
+                    const newConfigs = agentModelConfigs.map((c) =>
+                      c.agentId === selectedAgentId ? { ...c, modelId: v } : c
+                    );
+                    setAgentModelConfigs(newConfigs);
+                    apiFetch("/api/agent-models", { method: "PUT", body: JSON.stringify({ configs: newConfigs }) });
+                  } else {
+                    setSelectedModelId(v);
+                  }
+                }}
+                style={{ padding: "2px 4px", border: "none", fontSize: 12, background: "transparent", maxWidth: 150, cursor: "pointer" }}
+              >
+                {(() => {
+                  const cfgProviderId = agentModelConfigs.find((c) => c.agentId === selectedAgentId && !c.useGlobal)?.providerId ?? selectedProviderId;
+                  const cfgModels = models.filter((m) => m.providerId === cfgProviderId);
+                  if (cfgModels.length === 0) return <option value="">无模型</option>;
+                  return cfgModels.map((m) => (
+                    <option key={m.id} value={m.id}>{m.id}</option>
+                  ));
+                })()}
+              </select>
+            </div>
+            {(() => {
+              const cfgProviderId = agentModelConfigs.find((c) => c.agentId === selectedAgentId && !c.useGlobal)?.providerId ?? selectedProviderId;
+              const cfgProvider = providers.find((p) => p.id === cfgProviderId);
+              if (cfgProvider?.type !== "xiaomi-mimo") return null;
+              return (
+                <button
+                  className="icon-btn"
+                  onClick={() => {
+                    const updated = { ...cfgProvider, webSearchEnabled: !cfgProvider.webSearchEnabled };
+                    const newProviders = providers.map((pp) => pp.id === cfgProvider.id ? updated : pp);
+                    setProviders(newProviders);
+                    saveProviders(newProviders);
+                    syncProvidersToServer(newProviders);
+                  }}
+                  title={cfgProvider.webSearchEnabled ? "关闭联网搜索" : "开启联网搜索"}
+                  style={{ color: cfgProvider.webSearchEnabled ? "var(--primary)" : "var(--text-muted)" }}
+                >
+                  <Search size={14} />
+                </button>
+              );
+            })()}
             <button
               className={`icon-btn ${ttsEnabled ? "tts-active" : ""}`}
               onClick={() => setTtsEnabled(!ttsEnabled)}
               title={ttsEnabled ? "关闭语音朗读" : "开启语音朗读"}
               style={{ color: ttsEnabled ? "var(--primary)" : "var(--text-muted)" }}
             >
-              {ttsEnabled ? "🔊" : "🔇"}
+              {ttsEnabled ? <Volume2 size={14} /> : <VolumeX size={14} />}
             </button>
           </div>
         </div>
@@ -943,23 +1014,6 @@ export function App() {
                         style={{ flex: 1, padding: "6px 10px", borderRadius: 6, border: "1px solid var(--border)" }}
                       >
                         <option value="https://api.xiaomimimo.com/v1">标准 (api.xiaomimimo.com)</option>
-                        <option value="https://token-plan-cn.xiaomimimo.com/v1">Token Plan CN</option>
-                      </select>
-                    </div>
-                    <div className="field-row">
-                      <label>联网搜索</label>
-                      <select
-                        value={p.altBaseUrl ?? ""}
-                        onChange={(e) => {
-                          const updated = { ...p, altBaseUrl: e.target.value || undefined };
-                          const newProviders = providers.map((pp) => pp.id === p.id ? updated : pp);
-                          setProviders(newProviders);
-                          saveProviders(newProviders);
-                          syncProvidersToServer(newProviders);
-                        }}
-                        style={{ flex: 1, padding: "6px 10px", borderRadius: 6, border: "1px solid var(--border)" }}
-                      >
-                        <option value="">默认 ({p.baseUrl})</option>
                         <option value="https://token-plan-cn.xiaomimimo.com/v1">Token Plan CN</option>
                       </select>
                     </div>

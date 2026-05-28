@@ -56,7 +56,10 @@ export async function discoverModels(
 
   const url = `${provider.baseUrl.replace(/\/$/, "")}/models`;
   const headers: Record<string, string> = {};
-  if (provider.apiKey) headers["Authorization"] = `Bearer ${provider.apiKey}`;
+  if (provider.apiKey) {
+    headers["Authorization"] = `Bearer ${provider.apiKey}`;
+    if (provider.type === "xiaomi-mimo") headers["api-key"] = provider.apiKey;
+  }
   if (provider.type === "gemini") {
     const geminiUrl = `${provider.baseUrl.replace(/\/$/, "")}/models?key=${provider.apiKey}`;
     const response = await fetcher(geminiUrl);
