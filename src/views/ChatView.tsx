@@ -236,7 +236,7 @@ export function ChatView() {
     let conv = activeConversation;
     if (!conv) conv = createConversation("chat", message.slice(0, 30));
 
-    const userMsg: ChatMessage = { id: uid(), role: "user", content: fullMessage, createdAt: new Date().toISOString() };
+    const userMsg: ChatMessage = { id: uid(), role: "user", content: fullMessage, imageData: imageDataToSend ?? undefined, attachedFiles: attachedFiles.length > 0 ? attachedFiles.map((f) => ({ name: f.name, type: f.type, size: f.size, content: f.content })) : undefined, createdAt: new Date().toISOString() };
     const updatedMessages = [...conv.messages, userMsg];
     const updatedConv = { ...conv, messages: updatedMessages, updatedAt: new Date().toISOString() };
     setConversations((prev) => {
@@ -416,7 +416,19 @@ export function ChatView() {
                     })()}
                   </div>
                 )}
-                <div style={{ whiteSpace: "pre-wrap" }}>{msg.content}</div>
+                {msg.imageData && (
+                  <div style={{ marginBottom: 6 }}>
+                    <img src={msg.imageData} alt="attached" style={{ maxWidth: 300, maxHeight: 200, borderRadius: 8, cursor: "pointer", objectFit: "contain" }} onClick={() => window.open(msg.imageData, "_blank")} />
+                  </div>
+                )}
+                {msg.attachedFiles && msg.attachedFiles.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 6 }}>
+                    {msg.attachedFiles.map((f, i) => (
+                      <span key={i} style={{ fontSize: 11, padding: "2px 6px", borderRadius: 4, background: "var(--bg)", border: "1px solid var(--border)" }}>📄 {f.name}</span>
+                    ))}
+                  </div>
+                )}
+                <div style={{ whiteSpace: "pre-wrap" }}>{msg.content.replace(/\[图片已附加\]\s*/g, "").replace(/\[文件:[^\]]+\]\s*/g, "")}</div>
                 {msg.role === "assistant" && renderCitations(msg.content)}
                 {msg.role === "assistant" && (
                   <div style={{ display: "flex", gap: 4, marginTop: 4, alignItems: "center" }}>
