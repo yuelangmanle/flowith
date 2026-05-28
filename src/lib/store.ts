@@ -109,7 +109,17 @@ export const useStore = create<AppState>((set, get) => ({
   setRightTab: (t) => set({ rightTab: t }),
 
   // Providers & Models
-  providers: loadProviders() ?? createDefaultProviders(),
+  providers: (() => {
+    const saved = loadProviders();
+    if (!saved) return createDefaultProviders();
+    // Merge saved with defaults: keep saved settings, add any new default providers
+    const defaults = createDefaultProviders();
+    const merged = [...saved];
+    for (const def of defaults) {
+      if (!merged.find((p) => p.id === def.id)) merged.push(def);
+    }
+    return merged;
+  })(),
   setProviders: (p) => set({ providers: typeof p === "function" ? p(get().providers) : p }),
   models: [],
   setModels: (m) => set({ models: typeof m === "function" ? m(get().models) : m }),
