@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Loader2, Search, Send, Volume2, VolumeX } from "lucide-react";
+import { Copy, Loader2, RefreshCw, Search, Send, Volume2, VolumeX } from "lucide-react";
 import { useStore } from "../lib/store";
 import { apiFetch, formatTime, getProviderIcon, uid } from "../lib/shared";
 import { saveProviders } from "../core/persistence";
@@ -56,6 +56,10 @@ export function ChatView() {
       speakText(lastMsg.content, lastMsg.agentId);
     }
   }, [activeConversation?.messages, ttsEnabled, agentTTSConfigs]); // eslint-disable-line
+
+  const copyToClipboard = async (text: string) => {
+    try { await navigator.clipboard.writeText(text); showToast("已复制到剪贴板", "success"); } catch { showToast("复制失败", "error"); }
+  };
 
   const speakText = useCallback(async (text: string, agentId?: string) => {
     const agentTTS = agentId ? agentTTSConfigs.find((c) => c.agentId === agentId) : undefined;
@@ -216,10 +220,24 @@ export function ChatView() {
                   </div>
                 )}
                 <div style={{ whiteSpace: "pre-wrap" }}>{msg.content}</div>
-                {msg.role === "assistant" && (ttsEnabled || agentTTSConfigs.find((c) => c.agentId === msg.agentId)?.enabled) && (
-                  <button className="icon-btn" style={{ marginTop: 4, fontSize: 12, padding: "2px 6px", display: "inline-flex", alignItems: "center", gap: 3 }} onClick={() => speakText(msg.content, msg.agentId)} disabled={ttsPlaying} title="朗读此消息">
-                    {ttsPlaying ? "⏳" : <Volume2 size={12} />}
-                  </button>
+                {msg.role === "assistant" && (
+                  <div style={{ display: "flex", gap: 4, marginTop: 4, alignItems: "center" }}>
+                    <button className="icon-btn" onClick={() => copyToClipboard(msg.content)} title="复制" style={{ fontSize: 11, padding: "2px 4px", display: "inline-flex", alignItems: "center" }}>
+                      <Copy size={12} />
+                    </button>
+                    <button className="icon-btn" onClick={() => {
+                      const msgIdx = activeConversation?.messages.findIndex((m) => m.id === msg.id);
+                      const prevUserMsg = msgIdx && activeConversation ? activeConversation.messages.slice(0, msgIdx).reverse().find((m) => m.role === "user") : null;
+                      if (prevUserMsg) sendChatMessage(prevUserMsg.content);
+                    }} title="重新生成" style={{ fontSize: 11, padding: "2px 4px", display: "inline-flex", alignItems: "center" }}>
+                      <RefreshCw size={12} />
+                    </button>
+                    {(ttsEnabled || agentTTSConfigs.find((c) => c.agentId === msg.agentId)?.enabled) && (
+                      <button className="icon-btn" style={{ fontSize: 11, padding: "2px 4px", display: "inline-flex", alignItems: "center" }} onClick={() => speakText(msg.content, msg.agentId)} disabled={ttsPlaying} title="朗读此消息">
+                        {ttsPlaying ? "⏳" : <Volume2 size={12} />}
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
               <div className="msg-time">{formatTime(msg.createdAt)}</div>

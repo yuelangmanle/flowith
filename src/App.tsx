@@ -1,7 +1,7 @@
-import { useEffect, Component, type ReactNode } from "react";
+import { useEffect, useState, Component, type ReactNode } from "react";
 import {
-  Bot, Code2, FolderOpen, Loader2, MessageSquare, MessageSquarePlus,
-  PanelLeftClose, PanelLeftOpen, Settings, Trash2, Users,
+  Bot, Code2, Download, FolderOpen, Loader2, MessageSquare, MessageSquarePlus,
+  PanelLeftClose, PanelLeftOpen, Search, Settings, Trash2, Users,
 } from "lucide-react";
 import { useStore } from "./lib/store";
 import { apiFetch } from "./lib/shared";
@@ -44,6 +44,19 @@ export function App() {
   } = store;
 
   useKeyboard();
+
+  const [convSearch, setConvSearch] = useState("");
+
+  const exportConversation = (conv: typeof conversations[0]) => {
+    const md = `# ${conv.title}\n\n` + conv.messages.map((m) => {
+      const role = m.role === "user" ? "👤 User" : m.agentName ? `${m.agentAvatar} ${m.agentName}` : "🤖 Assistant";
+      return `### ${role}\n${m.content}\n`;
+    }).join("\n---\n\n");
+    const blob = new Blob([md], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = `${conv.title}.md`; a.click();
+    URL.revokeObjectURL(url);
+  };
 
   // Server health + data loading
   useEffect(() => {
@@ -158,11 +171,18 @@ export function App() {
               </div>
               <div className="sidebar-section">对话历史</div>
               <button className="nav-item" onClick={() => createConversation()} style={{ margin: "0 8px 4px" }}><MessageSquarePlus size={14} /> 新对话</button>
+              <div style={{ padding: "0 8px 4px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg)" }}>
+                  <Search size={12} style={{ color: "var(--text-muted)", flexShrink: 0 }} />
+                  <input placeholder="搜索对话..." value={convSearch} onChange={(e) => setConvSearch(e.target.value)} style={{ border: "none", background: "transparent", fontSize: 12, flex: 1, outline: "none", color: "var(--text)" }} />
+                </div>
+              </div>
               <div className="conversation-list">
-                {conversations.map((c) => (
+                {conversations.filter((c) => !convSearch || c.title.toLowerCase().includes(convSearch.toLowerCase()) || c.messages.some((m) => m.content.toLowerCase().includes(convSearch.toLowerCase()))).map((c) => (
                   <div key={c.id} className={`conv-item ${store.activeConvId === c.id ? "active" : ""}`} onClick={() => { store.setActiveConvId(c.id); setView("chat"); }}>
                     <span className="conv-title">{c.title}</span>
                     <span className="conv-type">{c.type === "roundtable" ? "圆桌" : c.type === "group-chat" ? "群聊" : "对话"}</span>
+                    <button className="icon-btn" onClick={(e) => { e.stopPropagation(); exportConversation(c); }} title="导出" style={{ padding: "2px 4px" }}><Download size={10} /></button>
                     <button className="delete-btn" onClick={(e) => { e.stopPropagation(); deleteConversation(c.id); }}><Trash2 size={12} /></button>
                   </div>
                 ))}
