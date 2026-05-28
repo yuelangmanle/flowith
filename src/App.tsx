@@ -178,6 +178,15 @@ export function App() {
                 <button className={`nav-item ${view === "settings" ? "active" : ""}`} onClick={() => setView("settings")}><Settings size={16} /> 设置</button>
               </div>
               <div className="sidebar-section">对话历史</div>
+              {/* 快速 1v1：横向头像行 */}
+              <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "2px 8px 4px", flexShrink: 0, overflowX: "auto" }}>
+                <button className="quick-chat-avatar" title="自由对话（无预设）" onClick={() => { createConversation("chat", "自由对话"); setSelectedAgentId(""); setView("chat"); }}>💬</button>
+                {agents.map((a) => (
+                  <button key={a.id} className="quick-chat-avatar" title={a.name} onClick={() => { createConversation("chat", `与${a.name}对话`); setSelectedAgentId(a.id); setView("chat"); }}>
+                    {a.avatar}
+                  </button>
+                ))}
+              </div>
               <button className="nav-item" onClick={() => createConversation()} style={{ margin: "0 8px 4px" }}><MessageSquarePlus size={14} /> 新对话</button>
               <div style={{ padding: "0 8px 4px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg)" }}>
@@ -197,32 +206,7 @@ export function App() {
                   </div>
                 ))}
               </div>
-              <div className="sidebar-bottom">
-              <div className="sidebar-section">快速 1v1 对话</div>
-              <div className="sidebar-bottom-scroll" style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                {/* 无预设自由对话 */}
-                <button className="nav-item" style={{ justifyContent: "flex-start", gap: 8, fontSize: 11, padding: "3px 8px" }} onClick={() => {
-                  const conv = createConversation("chat", "自由对话");
-                  setSelectedAgentId("");
-                  setView("chat");
-                }}>
-                  <span style={{ fontSize: 14 }}>💬</span>
-                  <span style={{ flex: 1, textAlign: "left" }}>自由对话</span>
-                  <span style={{ fontSize: 10, color: "var(--text-muted)" }}>无预设</span>
-                </button>
-                {agents.map((a) => (
-                  <button key={a.id} className="nav-item" style={{ justifyContent: "flex-start", gap: 8, fontSize: 11, padding: "3px 8px" }} onClick={() => {
-                    const conv = createConversation("chat", `与${a.name}对话`);
-                    setSelectedAgentId(a.id);
-                    setView("chat");
-                  }}>
-                    <span style={{ fontSize: 14 }}>{a.avatar}</span>
-                    <span style={{ flex: 1, textAlign: "left" }}>{a.name}</span>
-                    <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{a.role}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+
               </div>
           )}
           <div className="main-content">
