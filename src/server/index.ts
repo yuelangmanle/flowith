@@ -310,7 +310,8 @@ export async function createServer() {
           agentId?: string;
           providerId?: string;
           model?: string;
-          imageData?: string;              // base64 data URL
+          imageData?: string;              // base64 data URL (first image, backward compat)
+          additionalImages?: string[];     // remaining images
           attachedFiles?: Array<{ name: string; type: string; size: number; content?: string }>;
           specifiedSkill?: string;         // 用户指定使用的 skill 名称
         };
@@ -324,6 +325,7 @@ export async function createServer() {
         const userMsg: ChatMessage = {
           id: uid(), role: "user", content: body.message,
           imageData: body.imageData,
+          additionalImages: body.additionalImages,
           attachedFiles: body.attachedFiles,
           createdAt: new Date().toISOString(),
         };
@@ -708,6 +710,8 @@ export async function createServer() {
 
       if (request.method === "POST" && path === "/api/skills/import-local") {
         const body = await readJson(request) as { name: string; content: string; description?: string };
+        if (!body.name || !body.content) return send(response, 400, { error: "名称和内容不能为空" });
+        if (body.content.length > 100000) return send(response, 400, { error: "内容过长，最大 100KB" });
         const skill = {
           id: `local-${Date.now()}`,
           name: body.name,

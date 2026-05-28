@@ -115,7 +115,8 @@ export interface ChatMessage {
   id: string;
   role: MessageRole;
   content: string;
-  imageData?: string;        // base64 data URL for attached images
+  imageData?: string;        // base64 data URL for first attached image
+  additionalImages?: string[]; // remaining images
   attachedFiles?: Array<{ name: string; type: string; size: number; content?: string }>; // attached files with extracted text
   agentId?: string;
   agentName?: string;

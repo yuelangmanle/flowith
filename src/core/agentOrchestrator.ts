@@ -255,9 +255,9 @@ export async function* streamAgentMessage(
   let systemPrompt = agent.systemPrompt ?? "";
 
   if (installedSkills && installedSkills.length > 0) {
-    const skillsContext = installedSkills.map((s) => {
-      const caps = s.capabilities ? ` [${s.capabilities.join(", ")}]` : "";
-      return `- ${s.nameZh}: ${s.descriptionZh}${caps}`;
+    const skillsContext = installedSkills.slice(0, 15).map((s) => {
+      const caps = s.capabilities ? ` [${s.capabilities.slice(0, 3).join(", ")}]` : "";
+      return `- ${s.nameZh}: ${s.descriptionZh.slice(0, 100)}${caps}`;
     }).join("\n");
 
     if (specifiedSkill) {

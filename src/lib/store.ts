@@ -212,7 +212,7 @@ export const useStore = create<AppState>((set, get) => ({
 
   pinConversation: (id) => {
     set((s) => {
-      const next = s.conversations.map((c) => c.id === id ? { ...c, pinned: !c.pinned } : c);
+      const next = s.conversations.map((c) => c.id === id ? { ...c, pinned: !c.pinned, updatedAt: new Date().toISOString() } : c);
       const conv = next.find((c) => c.id === id);
       if (conv) saveConversation(conv);
       try { apiFetch("/api/conversations", { method: "PUT", body: JSON.stringify({ conversations: next }) }); } catch {}

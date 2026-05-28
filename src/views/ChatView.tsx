@@ -56,6 +56,13 @@ export function ChatView() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView?.({ behavior: "smooth" });
   }, [activeConversation?.messages, streamingContent]);
+  // Cleanup: abort streaming on unmount
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
+
 
   // Auto-speak
   useEffect(() => {
@@ -302,7 +309,7 @@ export function ChatView() {
     let conv = activeConversation;
     if (!conv) conv = createConversation("chat", message.slice(0, 30));
 
-    const userMsg: ChatMessage = { id: uid(), role: "user", content: fullMessage, imageData: imageDataList[0] ?? undefined, attachedFiles: attachedFiles.length > 0 ? attachedFiles.map((f) => ({ name: f.name, type: f.type, size: f.size, content: f.content })) : undefined, createdAt: new Date().toISOString() };
+    const userMsg: ChatMessage = { id: uid(), role: "user", content: fullMessage, imageData: imageDataList[0] ?? undefined, additionalImages: imageDataList.length > 1 ? imageDataList.slice(1) : undefined, attachedFiles: attachedFiles.length > 0 ? attachedFiles.map((f) => ({ name: f.name, type: f.type, size: f.size, content: f.content })) : undefined, createdAt: new Date().toISOString() };
     const updatedMessages = [...conv.messages, userMsg];
     const updatedConv = { ...conv, messages: updatedMessages, updatedAt: new Date().toISOString() };
     setConversations((prev) => {
@@ -335,6 +342,7 @@ export function ChatView() {
         providerId: cfg.providerId,
         model: cfg.modelId,
         imageData: imageDataList[0] ?? undefined,
+        additionalImages: imageDataList.length > 1 ? imageDataList.slice(1) : undefined,
         attachedFiles: attachedFiles.length > 0 ? attachedFiles.map((f) => ({ name: f.name, type: f.type, size: f.size, content: f.content })) : undefined,
         specifiedSkill: specifiedSkill || undefined,
       }),
@@ -486,9 +494,14 @@ export function ChatView() {
                     })()}
                   </div>
                 )}
-                {msg.imageData && (
-                  <div style={{ marginBottom: 6 }}>
-                    <img src={msg.imageData} alt="attached" style={{ maxWidth: 300, maxHeight: 200, borderRadius: 8, cursor: "pointer", objectFit: "contain" }} onClick={() => setPreviewImage(msg.imageData!)} />
+                {(msg.imageData || (msg.additionalImages && msg.additionalImages.length > 0)) && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 6 }}>
+                    {msg.imageData && (
+                      <img src={msg.imageData} alt="attached" style={{ maxWidth: 300, maxHeight: 200, borderRadius: 8, cursor: "pointer", objectFit: "contain" }} onClick={() => setPreviewImage(msg.imageData!)} />
+                    )}
+                    {msg.additionalImages?.map((img, idx) => (
+                      <img key={idx} src={img} alt={`attached-${idx}`} style={{ maxWidth: 300, maxHeight: 200, borderRadius: 8, cursor: "pointer", objectFit: "contain" }} onClick={() => setPreviewImage(img)} />
+                    ))}
                   </div>
                 )}
                 {msg.attachedFiles && msg.attachedFiles.length > 0 && (
