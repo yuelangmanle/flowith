@@ -4,6 +4,7 @@ import { useStore } from "../lib/store";
 import { apiFetch, formatTime, getProviderIcon, uid } from "../lib/shared";
 import { saveProviders, saveConversation } from "../core/persistence";
 import { compressImage, formatBytes } from "../lib/imageCompress";
+import type { CompressResult } from "../lib/imageCompress";
 import type { ChatMessage } from "../core/types";
 
 export function ChatView() {
@@ -27,8 +28,12 @@ export function ChatView() {
   const lastSpokenMsgRef = useRef<string>("");
   const [continuousTts, setContinuousTts] = useState(false);
   const continuousTtsRef = useRef(false);
-  const [attachedImage, setAttachedImage] = useState<string | null>(null);
+  const [attachedImage, setAttachedImage] = useState<string | null>(null);  // preview data URL
+  const [rawFile, setRawFile] = useState<File | null>(null);                 // original file for upload
+  const [attachedFiles, setAttachedFiles] = useState<Array<{ name: string; type: string; size: number; content?: string; base64?: string }>>([]);
+  const [imageInfo, setImageInfo] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const chatAreaRef = useRef<HTMLDivElement>(null);
 
   // Auto-select first provider+model
   useEffect(() => {
@@ -61,21 +66,71 @@ export function ChatView() {
     }
   }, [activeConversation?.messages, ttsEnabled, agentTTSConfigs]); // eslint-disable-line
 
-  const [imageInfo, setImageInfo] = useState<string>("");
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/")) { showToast("目前仅支持图片上传", "error"); return; }
-    try {
-      showToast("压缩图片中...", "info");
-      const result = await compressImage(file);
-      setAttachedImage(result.dataUrl);
-      const fmt = result.format === "image/webp" ? "WEBP" : "JPEG";
-      setImageInfo(`${result.width}x${result.height} · ${formatBytes(result.originalSize)} → ${formatBytes(result.compressedSize)} (压缩${result.compressionRatio}) · ${fmt} q${(result.quality * 100).toFixed(0)}%`);
-    } catch (err) {
-      showToast("图片处理失败", "error");
+    const files = e.target.files;
+    if (!files) return;
+    for (const file of Array.from(files)) {
+      await processFile(file);
     }
     e.target.value = "";
+  };
+
+  const processFile = async (file: File) => {
+    if (file.type.startsWith("image/")) {
+      // Store raw file for original-first upload, create preview
+      setRawFile(file);
+      const reader = new FileReader();
+      reader.onload = () => {
+        setAttachedImage(reader.result as string);
+        setImageInfo(`${file.name} · ${formatBytes(file.size)} (原图)`);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      // Non-image file: extract content on server
+      showToast(`正在处理 ${file.name}...`, "info");
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = (reader.result as string).split(",")[1];
+        try {
+          const resp = await apiFetch("/api/extract-file", {
+            method: "POST",
+            body: JSON.stringify({ fileName: file.name, fileType: file.type, base64Data: base64 }),
+          });
+          if (resp.ok) {
+            const data = await resp.json() as { name: string; type: string; size: number; content: string; truncated?: boolean };
+            setAttachedFiles((prev) => [...prev, { ...data, base64 }]);
+            showToast(`${file.name} 已添加`, "success");
+          } else {
+            showToast(`文件处理失败`, "error");
+          }
+        } catch {
+          showToast(`文件处理失败`, "error");
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Drag & drop handler
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const files = e.dataTransfer.files;
+    for (const file of Array.from(files)) {
+      await processFile(file);
+    }
+  };
+
+  // Clipboard paste handler
+  const handlePaste = async (e: React.ClipboardEvent) => {
+    const items = e.clipboardData.items;
+    for (const item of Array.from(items)) {
+      if (item.kind === "file") {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) await processFile(file);
+      }
+    }
   };
 
   const renderCitations = (content: string) => {
@@ -158,9 +213,26 @@ export function ChatView() {
   }, []);
 
   const sendChatMessage = useCallback(async (message: string) => {
-    if (!message.trim() && !attachedImage) return;
-    const imagePrefix = attachedImage ? `[图片已附加] ` : "";
-    const fullMessage = imagePrefix + message;
+    if (!message.trim() && !attachedImage && attachedFiles.length === 0) return;
+    let imageDataToSend = attachedImage;
+    let compressionInfo = "";
+
+    // If we have a raw file, send original first (no pre-compression)
+    if (rawFile && attachedImage) {
+      // Read raw file as base64
+      const reader = new FileReader();
+      imageDataToSend = await new Promise<string>((resolve) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(rawFile);
+      });
+    }
+
+    const fileNames = attachedFiles.map((f) => f.name).join(", ");
+    const prefix = [
+      imageDataToSend ? "[图片已附加] " : "",
+      fileNames ? `[文件: ${fileNames}] ` : "",
+    ].join("");
+    const fullMessage = prefix + message;
     let conv = activeConversation;
     if (!conv) conv = createConversation("chat", message.slice(0, 30));
 
@@ -176,15 +248,26 @@ export function ChatView() {
 
     setChatInput("");
     setAttachedImage(null);
+    setRawFile(null);
+    setAttachedFiles([]);
+    setImageInfo("");
     setStreaming(true);
     setStreamingContent("");
     setStreamingAgent(null);
 
+    const cfg = getEffectiveConfig(selectedAgentId);
     try {
-      const cfg = getEffectiveConfig(selectedAgentId);
       const resp = await apiFetch("/api/chat", {
         method: "POST",
-        body: JSON.stringify({ conversationId: conv.id, message: fullMessage, agentId: selectedAgentId, providerId: cfg.providerId, model: cfg.modelId }),
+        body: JSON.stringify({
+        conversationId: conv.id,
+        message: fullMessage,
+        agentId: selectedAgentId,
+        providerId: cfg.providerId,
+        model: cfg.modelId,
+        imageData: imageDataToSend ?? undefined,
+        attachedFiles: attachedFiles.length > 0 ? attachedFiles.map((f) => ({ name: f.name, type: f.type, size: f.size, content: f.content })) : undefined,
+      }),
       });
       if (!resp.ok) { const err = await resp.json() as { error: string }; throw new Error(err.error); }
 
@@ -227,7 +310,33 @@ export function ChatView() {
       setConversations((prev) => prev.map((c) => c.id === finalConv.id ? finalConv : c));
       saveConversation(finalConv);
     } catch (err) {
-      const errorMsg: ChatMessage = { id: uid(), role: "system", content: `错误: ${err instanceof Error ? err.message : String(err)}`, createdAt: new Date().toISOString() };
+      const errMsg = err instanceof Error ? err.message : String(err);
+      // If failure might be due to image size, try compressing and retrying
+      if (rawFile && imageDataToSend && (errMsg.includes("413") || errMsg.includes("too large") || errMsg.includes("payload") || errMsg.includes("size"))) {
+        try {
+          showToast("原图过大，正在压缩重试...", "info");
+          const compressed = await compressImage(rawFile, { maxDimension: 1024, quality: 0.85, maxBytes: 2 * 1024 * 1024 });
+          const retryResp = await apiFetch("/api/chat", {
+            method: "POST",
+            body: JSON.stringify({ conversationId: conv.id, message: fullMessage, agentId: selectedAgentId, providerId: cfg.providerId, model: cfg.modelId, imageData: compressed.dataUrl, attachedFiles: attachedFiles.length > 0 ? attachedFiles.map((f) => ({ name: f.name, type: f.type, size: f.size, content: f.content })) : undefined }),
+          });
+          if (retryResp.ok) {
+            // Process retry response (simplified - read all at once)
+            const retryData = await retryResp.json() as { content?: string };
+            const agent = agents.find((a) => a.id === selectedAgentId);
+            const assistantMsg: ChatMessage = { id: uid(), role: "assistant", content: retryData.content || "(压缩重试成功)", agentId: agent?.id, agentName: agent?.name, agentColor: agent?.color, agentAvatar: agent?.avatar, createdAt: new Date().toISOString() };
+            const finalConv2 = { ...updatedConv, messages: [...updatedMessages, assistantMsg], updatedAt: new Date().toISOString() };
+            setConversations((prev) => prev.map((c) => c.id === finalConv2.id ? finalConv2 : c));
+            saveConversation(finalConv2);
+            compressionInfo = ` (已压缩: ${formatBytes(compressed.originalSize)} → ${formatBytes(compressed.compressedSize)})`;
+            showToast(`压缩重试成功${compressionInfo}`, "success");
+            return;
+          }
+        } catch {
+          // Compression retry also failed
+        }
+      }
+      const errorMsg: ChatMessage = { id: uid(), role: "system", content: `错误: ${errMsg}`, createdAt: new Date().toISOString() };
       const finalConv = { ...updatedConv, messages: [...updatedMessages, errorMsg], updatedAt: new Date().toISOString() };
       setConversations((prev) => prev.map((c) => c.id === finalConv.id ? finalConv : c));
       saveConversation(finalConv);
@@ -356,19 +465,33 @@ export function ChatView() {
         <div ref={messagesEndRef} />
       </div>
       <div className="chat-input-area">
-        {attachedImage && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, padding: 8, borderRadius: 8, background: "var(--bg-card)", border: "1px solid var(--border)" }}>
-            <img src={attachedImage} alt="预览" style={{ maxWidth: 80, maxHeight: 60, borderRadius: 4, objectFit: "cover" }} />
-            <div><span style={{ fontSize: 12, color: "var(--text-muted)" }}>已附加图片</span>{imageInfo && <span style={{ fontSize: 10, color: "var(--text-muted)", display: "block" }}>{imageInfo}</span>}</div>
-            <button className="icon-btn" onClick={() => { setAttachedImage(null); setImageInfo(""); }} style={{ fontSize: 11 }}>✕</button>
+        {(attachedImage || attachedFiles.length > 0) && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8, padding: 8, borderRadius: 8, background: "var(--bg-card)", border: "1px solid var(--border)" }}>
+            {attachedImage && (
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <img src={attachedImage} alt="预览" style={{ maxWidth: 60, maxHeight: 45, borderRadius: 4, objectFit: "cover" }} />
+                <div>
+                  <span style={{ fontSize: 11, color: "var(--text-muted)" }}>图片</span>
+                  {imageInfo && <span style={{ fontSize: 10, color: "var(--text-muted)", display: "block" }}>{imageInfo}</span>}
+                </div>
+                <button className="icon-btn" onClick={() => { setAttachedImage(null); setRawFile(null); setImageInfo(""); }} style={{ fontSize: 11 }}>✕</button>
+              </div>
+            )}
+            {attachedFiles.map((f, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, padding: "2px 6px", borderRadius: 4, background: "var(--bg)", border: "1px solid var(--border)" }}>
+                <span style={{ fontSize: 11 }}>📄 {f.name}</span>
+                <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{formatBytes(f.size)}</span>
+                <button className="icon-btn" onClick={() => setAttachedFiles((prev) => prev.filter((_, idx) => idx !== i))} style={{ fontSize: 10 }}>✕</button>
+              </div>
+            ))}
           </div>
         )}
-        <div className="chat-input-wrapper">
-          <input type="file" ref={fileInputRef} accept="image/*" onChange={handleFileSelect} style={{ display: "none" }} />
-          <button className="icon-btn" onClick={() => fileInputRef.current?.click()} title="附加图片" style={{ color: "var(--text-muted)", flexShrink: 0 }}>
+        <div className="chat-input-wrapper" onDrop={handleDrop} onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+          <input type="file" ref={fileInputRef} accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.zip,.txt,.md,.json,.ts,.tsx,.js,.py,.rs,.go,.java" multiple onChange={handleFileSelect} style={{ display: "none" }} />
+          <button className="icon-btn" onClick={() => fileInputRef.current?.click()} title="附加文件 (图片/PDF/Excel/Word/ZIP)" style={{ color: "var(--text-muted)", flexShrink: 0 }}>
             <Image size={16} />
           </button>
-          <textarea className="chat-input" placeholder={`与 ${agents.find((a) => a.id === selectedAgentId)?.name ?? "Agent"} 对话...`} value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChatMessage(chatInput); } }} rows={1} disabled={streaming} />
+          <textarea className="chat-input" placeholder={`与 ${agents.find((a) => a.id === selectedAgentId)?.name ?? "Agent"} 对话...`} value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChatMessage(chatInput); } }} onPaste={handlePaste} rows={1} disabled={streaming} />
           <button className="primary" onClick={() => sendChatMessage(chatInput)} disabled={streaming || (!chatInput.trim() && !attachedImage)} style={{ borderRadius: 10, padding: "10px 16px" }}>
             {streaming ? <Loader2 size={16} className="spin" /> : <Send size={16} />}
           </button>

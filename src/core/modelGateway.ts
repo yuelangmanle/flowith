@@ -117,10 +117,22 @@ export function mergeDiscoveredModels(
 
 // ─── Real Chat Completion ───────────────────────────────────────
 
+export interface ImageContent {
+  type: "image_url";
+  image_url: { url: string; detail?: "auto" | "low" | "high" };
+}
+
+export interface TextContent {
+  type: "text";
+  text: string;
+}
+
+export type MessageContent = string | Array<TextContent | ImageContent>;
+
 export interface ChatCompletionRequest {
   provider: ProviderConfig;
   model: string;
-  messages: Array<{ role: string; content: string }>;
+  messages: Array<{ role: string; content: MessageContent }>;
   stream?: boolean;
   temperature?: number;
   maxTokens?: number;

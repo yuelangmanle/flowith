@@ -21,6 +21,7 @@ import {
 import { runSequential, runHierarchical, streamAgentMessage } from "../core/agentOrchestrator";
 import { createCodeGenRun, runFullPipeline, getProgressPercentage } from "../core/codeGeneration";
 import { createMemoryStore, addToL1, addToL2, addFact, queryMemory, writeMemory } from "../core/memoryKnowledge";
+import { extractFileContent } from "./fileExtractor";
 import type {
   Conversation,
   ChatMessage,
@@ -300,6 +301,8 @@ export async function createServer() {
           agentId?: string;
           providerId?: string;
           model?: string;
+          imageData?: string;              // base64 data URL
+          attachedFiles?: Array<{ name: string; type: string; size: number; content?: string }>;
         };
 
         let conv = conversations.get(body.conversationId);
@@ -309,7 +312,10 @@ export async function createServer() {
         }
 
         const userMsg: ChatMessage = {
-          id: uid(), role: "user", content: body.message, createdAt: new Date().toISOString(),
+          id: uid(), role: "user", content: body.message,
+          imageData: body.imageData,
+          attachedFiles: body.attachedFiles,
+          createdAt: new Date().toISOString(),
         };
         conv.messages.push(userMsg);
 
@@ -639,6 +645,17 @@ export async function createServer() {
             model: body.model ?? agentTTS?.model ?? provider.ttsModel ?? "mimo-v2.5-tts",
             provider,
           });
+          return send(response, 200, result);
+        } catch (err) {
+          return send(response, 500, { error: err instanceof Error ? err.message : String(err) });
+        }
+      }
+
+      // ─── File Extract ─────────────────────────────────
+      if (request.method === "POST" && path === "/api/extract-file") {
+        const body = await readJson(request) as { fileName: string; fileType: string; base64Data: string };
+        try {
+          const result = await extractFileContent(body.fileName, body.fileType, body.base64Data);
           return send(response, 200, result);
         } catch (err) {
           return send(response, 500, { error: err instanceof Error ? err.message : String(err) });

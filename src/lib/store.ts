@@ -7,7 +7,7 @@ import type { AgentConfig, AgentTTSConfig, ChatMessage, Conversation, ModelConfi
 
 // ─── Types ─────────────────────────────────────────────────────
 
-export type View = "chat" | "settings" | "roundtable" | "projects" | "codegen" | "agents";
+export type View = "chat" | "settings" | "roundtable" | "projects" | "codegen" | "agents" | "skills";
 export type RightTab = "agents" | "models" | "info";
 
 interface AgentModelConfig {
