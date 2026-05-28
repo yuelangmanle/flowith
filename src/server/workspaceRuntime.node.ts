@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve, relative, join } from "node:path";
-import { compressOutput, isDangerousCommand } from "../core/workspaceRuntime";
+import { compressOutput, isDangerousCommand } from "../core/toolRuntime";
 
 export interface NodeWorkspace {
   id: string;

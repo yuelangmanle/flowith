@@ -3,7 +3,7 @@ import {
   createDefaultProviders,
   discoverModels,
   getFallbackModels,
-  mergeDiscoveredModels
+  mergeDiscoveredModels,
 } from "../modelGateway";
 import type { ProviderConfig } from "../types";
 
@@ -18,7 +18,7 @@ describe("model gateway", () => {
       "qwen",
       "moonshot",
       "ollama",
-      "openai-compatible"
+      "openai-compatible",
     ]);
     expect(providers.every((provider) => "baseUrl" in provider && "apiKey" in provider)).toBe(true);
   });
@@ -31,11 +31,13 @@ describe("model gateway", () => {
       baseUrl: "https://example.test/v1",
       apiKey: "test",
       enabled: true,
-      supportsModelList: true
+      supportsModelList: true,
     };
     const models = await discoverModels(provider, async (url) => {
       expect(String(url)).toBe("https://example.test/v1/models");
-      return new Response(JSON.stringify({ data: [{ id: "gpt-code-large" }, { id: "text-embedding-3-small" }] }));
+      return new Response(
+        JSON.stringify({ data: [{ id: "gpt-code-large" }, { id: "text-embedding-3-small" }] })
+      );
     });
     expect(models).toHaveLength(2);
     expect(models[0].capabilities).toEqual(expect.objectContaining({ chat: true, toolCalling: true }));
@@ -52,15 +54,19 @@ describe("model gateway", () => {
     expect(models[0].capabilities.local).toBe(true);
   });
 
-  it("uses fallback models and preserves stale models when refresh fails", async () => {
+  it("uses fallback models when discovery is not supported", () => {
     const provider = createDefaultProviders().find((item) => item.type === "anthropic")!;
     const fallback = getFallbackModels(provider);
     expect(fallback.length).toBeGreaterThan(0);
+    expect(fallback[0].providerId).toBe(provider.id);
+  });
 
+  it("preserves stale models when refresh fails", () => {
+    const provider = createDefaultProviders().find((item) => item.type === "anthropic")!;
+    const fallback = getFallbackModels(provider);
     const existing = [{ ...fallback[0], stale: false }];
     const merged = mergeDiscoveredModels(existing, [], "network failed");
     expect(merged[0].stale).toBe(true);
     expect(merged[0].lastError).toBe("network failed");
   });
 });
-

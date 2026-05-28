@@ -1,155 +1,281 @@
-import { createReadme, createArchitectureDoc, createNextSteps } from "./artifacts";
-import { researchOfficialDocs } from "./docsResearch";
-import { createKnowledgeBase, createMemoryStore, upsertKnowledgeSource, writeMemory } from "./memoryKnowledge";
-import type { AgentConfig, ApprovalRequest, Artifact, KnowledgeSource, MemoryItem } from "./types";
+import type {
+  AgentConfig,
+  OrchestrationMode,
+  OrchestrationPlan,
+  Conversation,
+  ChatMessage,
+  ProviderConfig,
+  StreamChunk,
+  MessageRole,
+} from "./types";
+import { getAgentById, getAgentsForProjectGeneration, getAgentsForRoundtable } from "./agentConfig";
+import { streamChatCompletion } from "./modelGateway";
 
-export interface ProjectGenerationInput {
-  idea: string;
-  stackOverride?: string;
-  confirmPlan: boolean;
-  approveDangerousActions: boolean;
-}
+// ─── Orchestration Plan ─────────────────────────────────────────
 
-export interface ProjectGenerationRun {
-  id: string;
-  status: "waiting-for-plan" | "waiting-for-approval" | "completed";
-  clarifyingQuestions: string[];
-  stack: { name: string; status: "official" | "experimental" };
-  agents: AgentConfig[];
-  approvals: ApprovalRequest[];
-  artifacts: Artifact[];
-  memoryItems: MemoryItem[];
-  knowledgeSources: KnowledgeSource[];
-  preview: { url: string; status: "ready" | "waiting" };
-  fixLoopCount: number;
-  logs: string[];
-  files: Record<string, string>;
-}
-
-export async function runProjectGeneration(input: ProjectGenerationInput): Promise<ProjectGenerationRun> {
-  const memory = createMemoryStore();
-  const knowledge = createKnowledgeBase();
-  const stackName = input.stackOverride ?? "Vite + React + TypeScript";
-  const official = ["Vite + React + TypeScript", "Next.js + TypeScript + SQLite", "Agent Workflow App"].includes(stackName);
-  const docsFinding = await researchOfficialDocs({
-    topic: "Vite project setup",
-    url: "https://vitejs.dev/guide/",
-    fetcher: async () => new Response("Vite official guide: npm create vite, npm install, npm run dev.")
-  });
-
-  const source = upsertKnowledgeSource(knowledge, {
-    id: "docs-vite-guide",
-    kind: "official-docs",
-    title: "Vite Guide",
-    content: docsFinding.summary,
-    metadata: {
-      projectId: "project-ai-resume",
-      sourceUrl: docsFinding.citation.url,
-      fetchedAt: docsFinding.citation.fetchedAt,
-      citationLocation: docsFinding.citation.location
-    }
-  });
-
-  const projectMemory = writeMemory(memory, {
-    type: "project",
-    content: "AI 简历优化工具采用 Vite + React + TypeScript，第一版聚焦简历和岗位描述分析。",
-    confirmed: true,
-    source: { runId: "run-ai-resume", messageId: "plan-confirmed", toolCallId: "tool-docs-vite" },
-    scope: "project"
-  });
-
-  const artifacts = [createReadme("AI Resume Optimizer"), createArchitectureDoc(), createNextSteps()];
-  const files = {
-    "package.json": JSON.stringify({
-      type: "module",
-      scripts: { dev: "vite --host 127.0.0.1" },
-      dependencies: { "@vitejs/plugin-react": "latest", vite: "latest", typescript: "latest", react: "latest", "react-dom": "latest" },
-      devDependencies: {}
-    }, null, 2),
-    "index.html": `<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>AI Resume Optimizer</title></head><body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body></html>`,
-    "vite.config.ts": `import { defineConfig } from 'vite'; import react from '@vitejs/plugin-react'; export default defineConfig({ plugins: [react()] });`,
-    "tsconfig.json": JSON.stringify({ compilerOptions: { target: "ES2022", lib: ["DOM", "DOM.Iterable", "ES2022"], module: "ESNext", moduleResolution: "Node", jsx: "react-jsx", strict: true, noEmit: true }, include: ["src"] }, null, 2),
-    "src/App.tsx": `export function App() { return <main style={{fontFamily:'system-ui',padding:32,maxWidth:960,margin:'0 auto'}}><h1>AI Resume Optimizer</h1><p>Paste a resume and job description to generate focused improvement suggestions.</p><section style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}><textarea style={{minHeight:220,padding:12}} placeholder="Resume" /><textarea style={{minHeight:220,padding:12}} placeholder="Job description" /></section><button style={{marginTop:16,padding:'10px 14px'}}>Generate suggestions</button></main>; }`,
-    "src/main.tsx": `import { createRoot } from 'react-dom/client'; import { App } from './App'; createRoot(document.getElementById('root')!).render(<App />);`,
-    "README.md": artifacts[0].content,
-    "docs/architecture.md": artifacts[1].content
-  };
-
+export function createOrchestrationPlan(
+  mode: OrchestrationMode,
+  topic: string,
+  agentIds: string[],
+  maxRounds: number = 3
+): OrchestrationPlan {
   return {
-    id: "run-ai-resume",
-    status: input.approveDangerousActions ? "completed" : "waiting-for-approval",
-    clarifyingQuestions: [
-      "目标用户是求职者、HR，还是职业顾问？",
-      "是否需要登录和历史记录？",
-      "优化建议需要按岗位描述匹配吗？",
-      "第一版是否接入真实模型 API？"
-    ],
-    stack: { name: stackName, status: official ? "official" : "experimental" },
-    agents: createDefaultRunAgents(),
-    approvals: [
-      {
-        id: "approval-install",
-        type: "install-dependency",
-        agent: "开发 Agent",
-        reason: "安装 Vite/React 项目依赖。",
-        command: "npm install",
-        risk: "medium",
-        status: input.approveDangerousActions ? "approved" : "pending"
-      },
-      {
-        id: "approval-run",
-        type: "execute-command",
-        agent: "测试 Agent",
-        reason: "启动本地 dev server 进行预览。",
-        command: "npm run dev",
-        risk: "medium",
-        status: input.approveDangerousActions ? "approved" : "pending"
-      }
-    ],
-    artifacts,
-    memoryItems: [projectMemory],
-    knowledgeSources: [source],
-    preview: { url: "http://localhost:5173", status: "ready" },
-    fixLoopCount: 1,
-    logs: [
-      "产品 Agent 完成需求澄清。",
-      "架构 Agent 确认官方支持技术栈。",
-      "开发 Agent 写入项目文件。",
-      "测试 Agent 首次启动失败，补齐入口文件后通过。",
-      "文档 Agent 生成 README 和架构说明。"
-    ],
-    files
+    id: `plan-${Date.now()}`,
+    mode,
+    topic,
+    agentIds,
+    maxRounds,
+    status: "pending",
+    currentRound: 0,
+    currentAgentIndex: 0,
+    createdAt: new Date().toISOString(),
   };
 }
 
-export function runRoundtable(input: { topic: string; rounds: number; accepted: boolean }) {
-  const memory = createMemoryStore();
-  const messages = [
-    `产品 Agent：围绕“${input.topic}”先明确目标用户和核心收益。`,
-    "架构 Agent：建议把模型接入隔离在 Model Gateway，避免 UI 直接依赖厂商 SDK。",
-    "反方评审 Agent：需要控制第一版范围，先做可运行原型再扩展高级能力。"
-  ].slice(0, Math.max(3, input.rounds));
-  const summary = `结论：先把简历优化核心链路跑通，再加入历史记录、导出和多模型对比。`;
-  const memoryItems = input.accepted
-    ? [writeMemory(memory, {
-        type: "scenario",
-        content: summary,
-        confirmed: true,
-        source: { runId: "roundtable-1", messageId: "summary" },
-        scope: "project"
-      })]
-    : [];
-  return { messages, summary, memoryItems };
+// ─── Sequential Mode ────────────────────────────────────────────
+
+export async function* runSequential(
+  agents: AgentConfig[],
+  topic: string,
+  provider: ProviderConfig,
+  model: string,
+  conversation: Conversation
+): AsyncGenerator<StreamChunk> {
+  let context = topic;
+
+  for (let i = 0; i < agents.length; i++) {
+    const agent = agents[i];
+    const messages: Array<{ role: string; content: string }> = [];
+
+    if (agent.systemPrompt) {
+      messages.push({ role: "system", content: agent.systemPrompt });
+    }
+
+    const prompt = i === 0
+      ? `任务: ${topic}\n\n请从你的专业角度（${agent.name}）开始工作。`
+      : `任务: ${topic}\n\n前一个 Agent 的输出:\n${context}\n\n请在此基础上继续。`;
+
+    messages.push({ role: "user", content: prompt });
+
+    yield {
+      type: "text",
+      content: "",
+      agentId: agent.id,
+      agentName: agent.name,
+      agentColor: agent.color,
+      agentAvatar: agent.avatar,
+    };
+
+    let fullContent = "";
+    try {
+      for await (const chunk of streamChatCompletion({ provider, model, messages, stream: true })) {
+        if (chunk.type === "text" && chunk.content) {
+          fullContent += chunk.content;
+          yield {
+            type: "text",
+            content: chunk.content,
+            agentId: agent.id,
+            agentName: agent.name,
+            agentColor: agent.color,
+            agentAvatar: agent.avatar,
+          };
+        }
+      }
+    } catch (err) {
+      fullContent = `[${agent.name} 失败: ${err instanceof Error ? err.message : String(err)}]`;
+    }
+
+    context = fullContent;
+
+    const msg: ChatMessage = {
+      id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      role: "assistant" as MessageRole,
+      content: fullContent,
+      agentId: agent.id,
+      agentName: agent.name,
+      agentColor: agent.color,
+      agentAvatar: agent.avatar,
+      createdAt: new Date().toISOString(),
+    };
+    conversation.messages.push(msg);
+  }
+
+  conversation.updatedAt = new Date().toISOString();
+  yield { type: "done" };
 }
 
-export function createDefaultRunAgents(): AgentConfig[] {
-  return [
-    ["product", "产品 Agent", ["memory", "docs"]],
-    ["architecture", "架构 Agent", ["docs", "model-gateway"]],
-    ["development", "开发 Agent", ["files", "commands"]],
-    ["ui", "UI Agent", ["files", "preview"]],
-    ["testing", "测试 Agent", ["commands", "preview"]],
-    ["documentation", "文档 Agent", ["files", "artifacts"]],
-    ["review", "评审 Agent", ["diff", "logs"]]
-  ].map(([role, name, tools]) => ({ id: `agent-${role}`, role: role as AgentConfig["role"], name: name as string, tools: tools as string[] }));
+// ─── Hierarchical Mode ──────────────────────────────────────────
+
+export async function* runHierarchical(
+  moderator: AgentConfig,
+  workers: AgentConfig[],
+  topic: string,
+  provider: ProviderConfig,
+  model: string,
+  conversation: Conversation,
+  maxRounds: number = 2
+): AsyncGenerator<StreamChunk> {
+  // 主持分配任务
+  const taskAssignments: Map<string, string> = new Map();
+
+  // Round 1: 主持分配
+  {
+    const prompt = `主题: ${topic}\n\n参与者: ${workers.map((w) => `${w.name}(${w.goal})`).join(", ")}\n\n请为每个参与者分配具体任务。格式:\n[Agent名]: 任务描述`;
+    const messages = [
+      { role: "system", content: moderator.systemPrompt },
+      { role: "user", content: prompt },
+    ];
+
+    yield { type: "text", content: "", agentId: moderator.id, agentName: moderator.name, agentColor: moderator.color, agentAvatar: moderator.avatar };
+
+    let fullContent = "";
+    try {
+      for await (const chunk of streamChatCompletion({ provider, model, messages, stream: true })) {
+        if (chunk.type === "text" && chunk.content) {
+          fullContent += chunk.content;
+          yield { type: "text", content: chunk.content, agentId: moderator.id, agentName: moderator.name, agentColor: moderator.color, agentAvatar: moderator.avatar };
+        }
+      }
+    } catch (err) {
+      fullContent = `[主持分配失败: ${err instanceof Error ? err.message : String(err)}]`;
+    }
+
+    conversation.messages.push({
+      id: `msg-${Date.now()}`,
+      role: "assistant" as MessageRole,
+      content: fullContent,
+      agentId: moderator.id,
+      agentName: moderator.name,
+      agentColor: moderator.color,
+      agentAvatar: moderator.avatar,
+      createdAt: new Date().toISOString(),
+    });
+  }
+
+  // Round 2+: 工人执行
+  for (let round = 0; round < maxRounds; round++) {
+    for (const worker of workers) {
+      const recentMessages = conversation.messages.slice(-10);
+      const history = recentMessages.map((m) => `[${m.agentName ?? "用户"}]: ${m.content.slice(0, 200)}`).join("\n");
+
+      const prompt = `主题: ${topic}\n\n讨论历史:\n${history}\n\n请完成你的任务并提交结果。`;
+      const messages = [
+        { role: "system", content: worker.systemPrompt },
+        { role: "user", content: prompt },
+      ];
+
+      yield { type: "text", content: "", agentId: worker.id, agentName: worker.name, agentColor: worker.color, agentAvatar: worker.avatar };
+
+      let fullContent = "";
+      try {
+        for await (const chunk of streamChatCompletion({ provider, model, messages, stream: true })) {
+          if (chunk.type === "text" && chunk.content) {
+            fullContent += chunk.content;
+            yield { type: "text", content: chunk.content, agentId: worker.id, agentName: worker.name, agentColor: worker.color, agentAvatar: worker.avatar };
+          }
+        }
+      } catch (err) {
+        fullContent = `[${worker.name} 失败: ${err instanceof Error ? err.message : String(err)}]`;
+      }
+
+      conversation.messages.push({
+        id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        role: "assistant" as MessageRole,
+        content: fullContent,
+        agentId: worker.id,
+        agentName: worker.name,
+        agentColor: worker.color,
+        agentAvatar: worker.avatar,
+        createdAt: new Date().toISOString(),
+        round,
+      });
+    }
+  }
+
+  // 主持总结
+  {
+    const history = conversation.messages.slice(-20).map((m) => `[${m.agentName}]: ${m.content.slice(0, 300)}`).join("\n");
+    const prompt = `主题: ${topic}\n\n所有人的工作成果:\n${history}\n\n请总结最终结论和下一步。`;
+    const messages = [
+      { role: "system", content: moderator.systemPrompt },
+      { role: "user", content: prompt },
+    ];
+
+    yield { type: "text", content: "", agentId: moderator.id, agentName: `${moderator.name}·总结`, agentColor: moderator.color, agentAvatar: moderator.avatar };
+
+    let fullContent = "";
+    try {
+      for await (const chunk of streamChatCompletion({ provider, model, messages, stream: true })) {
+        if (chunk.type === "text" && chunk.content) {
+          fullContent += chunk.content;
+          yield { type: "text", content: chunk.content, agentId: moderator.id, agentName: `${moderator.name}·总结`, agentColor: moderator.color, agentAvatar: moderator.avatar };
+        }
+      }
+    } catch (err) {
+      fullContent = `[总结失败: ${err instanceof Error ? err.message : String(err)}]`;
+    }
+
+    conversation.messages.push({
+      id: `msg-${Date.now()}`,
+      role: "assistant" as MessageRole,
+      content: fullContent,
+      agentId: moderator.id,
+      agentName: `${moderator.name}·总结`,
+      agentColor: moderator.color,
+      agentAvatar: moderator.avatar,
+      createdAt: new Date().toISOString(),
+    });
+  }
+
+  conversation.updatedAt = new Date().toISOString();
+  yield { type: "done" };
+}
+
+// ─── Roundtable Mode (delegated to roundtable.ts) ───────────────
+
+export { runRoundtableDiscussion } from "./roundtable";
+
+// ─── Single Agent Chat ──────────────────────────────────────────
+
+export async function* streamAgentMessage(
+  conversation: Conversation,
+  userMessage: string,
+  agentId: string,
+  provider: ProviderConfig,
+  modelId: string
+): AsyncGenerator<StreamChunk> {
+  const agent = getAgentById(agentId);
+  if (!agent) throw new Error(`Agent not found: ${agentId}`);
+
+  const messages: Array<{ role: string; content: string }> = [];
+
+  if (agent.systemPrompt) {
+    messages.push({ role: "system", content: agent.systemPrompt });
+  }
+
+  for (const msg of conversation.messages.slice(-30)) {
+    messages.push({
+      role: msg.role === "assistant" ? "assistant" : "user",
+      content: msg.agentName ? `[${msg.agentName}]: ${msg.content}` : msg.content,
+    });
+  }
+
+  messages.push({ role: "user", content: userMessage });
+
+  yield {
+    type: "text",
+    content: "",
+    agentId: agent.id,
+    agentName: agent.name,
+    agentColor: agent.color,
+    agentAvatar: agent.avatar,
+  };
+
+  yield* streamChatCompletion({ provider, model: modelId, messages, stream: true });
+}
+
+// ─── Project Generation (legacy) ────────────────────────────────
+
+export async function runProjectGeneration(_input: unknown): Promise<unknown> {
+  return { status: "delegated-to-codegen" };
 }

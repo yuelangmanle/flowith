@@ -1,3 +1,5 @@
+// ─── Provider & Model ───────────────────────────────────────────
+
 export type ProviderType =
   | "openai"
   | "anthropic"
@@ -7,17 +9,6 @@ export type ProviderType =
   | "moonshot"
   | "ollama"
   | "openai-compatible";
-
-export type AgentRole =
-  | "product"
-  | "architecture"
-  | "development"
-  | "ui"
-  | "testing"
-  | "documentation"
-  | "review"
-  | "moderator"
-  | "critic";
 
 export interface ProviderConfig {
   id: string;
@@ -56,41 +47,119 @@ export interface ModelConfig {
   lastError?: string;
 }
 
-export interface SourceRef {
-  runId?: string;
-  messageId?: string;
-  toolCallId?: string;
-  artifactId?: string;
+// ─── Agent ──────────────────────────────────────────────────────
+
+export type AgentRole =
+  | "product"
+  | "architecture"
+  | "development"
+  | "ui"
+  | "testing"
+  | "documentation"
+  | "review"
+  | "moderator"
+  | "critic"
+  | "coder"
+  | "researcher";
+
+export interface AgentConfig {
+  id: string;
+  role: AgentRole;
+  name: string;
+  avatar: string;
+  avatarType: "emoji" | "image";
+  goal: string;
+  backstory: string;
+  systemPrompt: string;
+  model?: string;
+  providerId?: string;
+  tools: string[];
+  color: string;
+  custom?: boolean;
 }
 
-export type MemoryType = "raw" | "fact" | "scenario" | "persona" | "project";
+// ─── Orchestration ──────────────────────────────────────────────
 
-export interface MemoryItem {
+export type OrchestrationMode = "sequential" | "hierarchical" | "roundtable";
+
+export interface OrchestrationPlan {
   id: string;
-  type: MemoryType;
-  content: string;
-  confidence: number;
-  source: SourceRef;
+  mode: OrchestrationMode;
+  topic: string;
+  agentIds: string[];
+  moderatorId?: string;
+  maxRounds: number;
+  status: "pending" | "running" | "completed" | "failed";
+  currentRound: number;
+  currentAgentIndex: number;
   createdAt: string;
-  lastUsedAt?: string;
-  confirmed: boolean;
-  scope: "project" | "global";
-  retention: "keep" | "expire" | "delete";
 }
 
-export interface KnowledgeSource {
+// ─── Conversation & Message ─────────────────────────────────────
+
+export type MessageRole = "user" | "assistant" | "system" | "tool";
+
+export interface ChatMessage {
   id: string;
-  kind: "official-docs" | "project-doc" | "code" | "report" | "roundtable";
-  title: string;
+  role: MessageRole;
   content: string;
-  metadata: {
-    projectId?: string;
-    sourceUrl?: string;
-    fetchedAt?: string;
-    documentVersion?: string;
-    apiVersion?: string;
-    citationLocation?: string;
-  };
+  agentId?: string;
+  agentName?: string;
+  agentColor?: string;
+  agentAvatar?: string;
+  toolCalls?: ToolCallResult[];
+  createdAt: string;
+  streaming?: boolean;
+  error?: string;
+  tokenUsage?: { prompt: number; completion: number };
+  round?: number;
+}
+
+export interface Conversation {
+  id: string;
+  title: string;
+  type: "chat" | "group-chat" | "project-generation" | "roundtable";
+  agentIds: string[];
+  messages: ChatMessage[];
+  createdAt: string;
+  updatedAt: string;
+  projectId?: string;
+  metadata?: Record<string, unknown>;
+}
+
+// ─── Tool ───────────────────────────────────────────────────────
+
+export type ToolType =
+  | "read-file"
+  | "write-file"
+  | "list-files"
+  | "run-command"
+  | "fetch-url"
+  | "search-knowledge"
+  | "read-memory"
+  | "write-memory"
+  | "browse-docs";
+
+export interface ToolDefinition {
+  name: string;
+  description: string;
+  type: ToolType;
+  parameters: Record<string, unknown>;
+  riskLevel: "low" | "medium" | "high";
+  requiresApproval: boolean;
+}
+
+export interface ToolCallResult {
+  id: string;
+  name: string;
+  type: ToolType;
+  arguments: string;
+  result?: string;
+  error?: string;
+  status: "pending" | "running" | "completed" | "failed" | "approval-required";
+  agentId?: string;
+  startTime?: string;
+  endTime?: string;
 }
 
 export interface ToolCallRecord {
@@ -107,15 +176,71 @@ export interface ToolCallRecord {
   createdAt: string;
 }
 
+// ─── Approval ───────────────────────────────────────────────────
+
+export type ApprovalType =
+  | "install-dependency"
+  | "execute-command"
+  | "network"
+  | "delete-file"
+  | "database-migration"
+  | "sensitive-read";
+
 export interface ApprovalRequest {
   id: string;
-  type: "install-dependency" | "execute-command" | "network" | "delete-file" | "database-migration" | "sensitive-read";
+  type: ApprovalType;
   agent: string;
   reason: string;
   command?: string;
-  risk: "medium" | "high";
+  url?: string;
+  path?: string;
+  risk: "low" | "medium" | "high";
   status: "pending" | "approved" | "denied";
+  createdAt: string;
+  conversationId?: string;
+  messageId?: string;
 }
+
+// ─── Voting ─────────────────────────────────────────────────────
+
+export interface VoteOption {
+  id: string;
+  label: string;
+  description?: string;
+  voterIds: string[];
+}
+
+export interface VoteSession {
+  id: string;
+  topic: string;
+  options: VoteOption[];
+  status: "active" | "closed";
+  createdAt: string;
+  closedAt?: string;
+  winnerId?: string;
+  conversationId: string;
+}
+
+// ─── Structured Report ──────────────────────────────────────────
+
+export interface ReportSection {
+  title: string;
+  content: string;
+  agentId?: string;
+}
+
+export interface StructuredReport {
+  id: string;
+  title: string;
+  topic: string;
+  sections: ReportSection[];
+  conclusion: string;
+  agentIds: string[];
+  conversationId: string;
+  createdAt: string;
+}
+
+// ─── Artifact & Memory ──────────────────────────────────────────
 
 export interface Artifact {
   id: string;
@@ -124,11 +249,174 @@ export interface Artifact {
   content: string;
 }
 
-export interface AgentConfig {
-  id: string;
-  role: AgentRole;
-  name: string;
-  model?: string;
-  tools: string[];
+export interface SourceRef {
+  runId?: string;
+  messageId?: string;
+  toolCallId?: string;
+  artifactId?: string;
 }
 
+export type MemoryType = "raw" | "fact" | "scenario" | "persona" | "project";
+
+// L1: 对话记忆 (短期, 内存)
+// L2: 工作记忆 (任务级, 内存)
+// L3: 事实记忆 (长期, 持久化)
+// L4: 情景记忆 (长期, 持久化)
+export type MemoryLayer = "L1-conversation" | "L2-working" | "L3-fact" | "L4-episodic";
+
+export interface MemoryItem {
+  id: string;
+  type: MemoryType;
+  layer: MemoryLayer;
+  content: string;
+  confidence: number;
+  source: SourceRef;
+  createdAt: string;
+  lastUsedAt?: string;
+  confirmed: boolean;
+  scope: "project" | "global";
+  retention: "keep" | "expire" | "delete";
+  importance: number; // 0-1, 用于衰减
+  tags: string[];
+}
+
+// ─── Knowledge ──────────────────────────────────────────────────
+
+export interface KnowledgeSource {
+  id: string;
+  kind: "official-docs" | "project-doc" | "code" | "report" | "roundtable";
+  title: string;
+  content: string;
+  metadata: {
+    projectId?: string;
+    sourceUrl?: string;
+    fetchedAt?: string;
+    documentVersion?: string;
+    apiVersion?: string;
+    citationLocation?: string;
+  };
+}
+
+// ─── Project & Workspace ────────────────────────────────────────
+
+export interface Project {
+  id: string;
+  name: string;
+  description: string;
+  techStack: string;
+  createdAt: string;
+  updatedAt: string;
+  workspacePath?: string;
+  files: Record<string, string>;
+  conversationIds: string[];
+  status: "planning" | "generating" | "running" | "completed" | "failed";
+}
+
+// ─── Code Generation Pipeline ───────────────────────────────────
+
+export type CodeGenPhase =
+  | "requirements"
+  | "design"
+  | "generation"
+  | "testing"
+  | "fixing"
+  | "documentation"
+  | "review"
+  | "completed";
+
+export interface CodeGenRun {
+  id: string;
+  projectId: string;
+  idea: string;
+  techStack: string;
+  phase: CodeGenPhase;
+  phaseHistory: Array<{
+    phase: CodeGenPhase;
+    startedAt: string;
+    completedAt?: string;
+    agentId: string;
+    output?: string;
+  }>;
+  fixAttempts: number;
+  maxFixAttempts: number;
+  status: "running" | "completed" | "failed" | "waiting-approval";
+  approvals: ApprovalRequest[];
+  artifacts: Artifact[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ─── App State ──────────────────────────────────────────────────
+
+export type AppView =
+  | "chat"
+  | "projects"
+  | "settings"
+  | "roundtable"
+  | "approvals"
+  | "knowledge"
+  | "workspace"
+  | "codegen"
+  | "agents";
+
+// ─── Streaming ──────────────────────────────────────────────────
+
+export interface StreamChunk {
+  type: "text" | "tool-call" | "error" | "done" | "usage";
+  content?: string;
+  toolCall?: Partial<ToolCallResult>;
+  error?: string;
+  usage?: { prompt: number; completion: number };
+  agentId?: string;
+  agentName?: string;
+  agentColor?: string;
+  agentAvatar?: string;
+  round?: number;
+}
+
+// ─── API Request / Response ─────────────────────────────────────
+
+export interface ChatRequest {
+  conversationId: string;
+  message: string;
+  model?: string;
+  providerId?: string;
+  stream?: boolean;
+}
+
+export interface DiscoverModelsRequest {
+  providerId: string;
+}
+
+export interface TestProviderRequest {
+  providerId: string;
+}
+
+export interface TestProviderResponse {
+  ok: boolean;
+  modelCount: number;
+  error?: string;
+  latencyMs?: number;
+}
+
+// ─── Multi-Agent Group Chat ─────────────────────────────────────
+
+export interface GroupChatConfig {
+  id: string;
+  name: string;
+  agentIds: string[];
+  turnOrder: "round-robin" | "random" | "moderator-picks";
+  maxTurnsPerAgent?: number;
+  topic?: string;
+}
+
+// ─── Docs Research ──────────────────────────────────────────────
+
+export interface DocsResearchResult {
+  url: string;
+  title: string;
+  summary: string;
+  official: boolean;
+  fetchedAt: string;
+  relevanceScore: number;
+}

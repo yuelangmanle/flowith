@@ -1,89 +1,129 @@
-# Multi-Agent Workspace MVP Handoff
+# Multi-Agent Workspace Platform - Handoff Document
 
-## What Exists
+## What Is This
 
-This repository now contains a local-first MVP for the multi-agent workspace platform described in:
+A local-first multi-AI agent work platform. Users can configure AI model providers, chat with specialized agents, run multi-agent roundtable discussions, generate projects, and manage approvals for dangerous operations.
 
-- `docs/superpowers/specs/2026-05-27-multi-agent-workspace-design.md`
-- `docs/superpowers/plans/2026-05-27-multi-agent-workspace-mvp.md`
+## Architecture
 
-The app provides:
+```
+Frontend (React + Vite)  ←→  API Server (Node HTTP)  ←→  AI Provider APIs
+     :5173                       :8787                   OpenAI/Anthropic/Gemini/...
+```
 
-- Workspace-first React UI.
-- Deterministic multi-agent project generation flow.
-- Multi-agent roundtable flow.
-- Model provider registry and model discovery logic.
-- Official documentation research helper.
-- Traceable memory and knowledge/RAG primitives.
-- Tool approval policy and dangerous command detection.
-- Real Node local workspace runtime.
-- Local API that writes generated project files into `.agent-workspaces/`.
+- **Frontend**: `src/App.tsx` + `src/styles.css` - Workspace-first UI with dark theme.
+- **Core logic**: `src/core/*.ts` - Business logic (pure TypeScript, no Node dependencies).
+- **Server**: `src/server/*.ts` - Node HTTP API server.
+- **Persistence**: localStorage (frontend) + in-memory (server).
 
 ## Run Commands
 
 ```bash
 npm install
-npm run dev
+npm run dev          # Start both frontend (5173) and API (8787)
+npm run dev:web      # Frontend only
+npm run api          # API only
+npm test -- --run    # Run tests
+npm run typecheck    # TypeScript check
+npm run build        # Production build
 ```
 
-Open:
+## API Endpoints
 
-- Web UI: `http://127.0.0.1:5173/`
-- API health: `http://127.0.0.1:8787/api/health`
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/health` | Health check |
+| GET | `/api/providers` | List providers |
+| POST | `/api/providers` | Update provider |
+| POST | `/api/providers/test` | Test provider connection |
+| POST | `/api/providers/discover` | Discover models |
+| GET | `/api/agents` | List agents |
+| GET | `/api/conversations` | List conversations |
+| POST | `/api/conversations` | Create conversation |
+| GET | `/api/conversations/:id` | Get conversation |
+| DELETE | `/api/conversations/:id` | Delete conversation |
+| POST | `/api/chat` | Send message (non-streaming) |
+| POST | `/api/chat/stream` | Send message (SSE streaming) |
+| POST | `/api/demo/run` | Run demo project generation |
+| GET | `/api/workspaces` | List workspaces |
+| GET | `/api/workspaces/:id/files` | List workspace files |
+| GET | `/api/workspaces/:id/file/:path` | Read workspace file |
 
-## Verification Commands
+## Key Files
 
-```bash
-npm test -- --run
-npm run typecheck
-npm run build
-```
+| File | Purpose |
+|------|---------|
+| `src/App.tsx` | Main UI - Chat, Settings, Roundtable, Projects, Approvals |
+| `src/styles.css` | Dark theme styles |
+| `src/core/types.ts` | All TypeScript type definitions |
+| `src/core/modelGateway.ts` | Provider config, model discovery, real API calls, streaming |
+| `src/core/agentConfig.ts` | 11 agent definitions with system prompts |
+| `src/core/agentOrchestrator.ts` | Agent chat, group chat, project generation |
+| `src/core/persistence.ts` | localStorage persistence |
+| `src/core/memoryKnowledge.ts` | Memory and knowledge base |
+| `src/core/docsResearch.ts` | Official docs research |
+| `src/core/workspaceRuntime.ts` | Tool approval policy |
+| `src/core/artifacts.ts` | Document generation |
+| `src/core/demoData.ts` | Default data and templates |
+| `src/core/appState.ts` | UI state management |
+| `src/server/index.ts` | API server (15+ endpoints) |
+| `src/server/workspaceRuntime.node.ts` | Real filesystem runtime |
 
-Current verified result:
+## Supported Providers
 
-- Tests: 8 files, 17 tests passed.
-- Typecheck: passed.
-- Build: passed.
+| Provider | Type | Streaming | Notes |
+|----------|------|-----------|-------|
+| OpenAI | openai | Yes | GPT-4.1, GPT-4o, o3-mini |
+| Anthropic | anthropic | Yes | Claude Sonnet 4, Haiku 4 |
+| Gemini | gemini | Yes | Gemini 2.5 Pro/Flash |
+| DeepSeek | deepseek | Yes | deepseek-chat, deepseek-reasoner |
+| Qwen/DashScope | qwen | Yes | qwen-plus, qwen-max |
+| Moonshot/Kimi | moonshot | Yes | kimi-k2 |
+| Ollama | ollama | Yes | Local models |
+| Custom | openai-compatible | Yes | Any OpenAI-compatible API |
 
-## Important Files
+## Agents
 
-- `src/App.tsx`: main workspace UI.
-- `src/core/types.ts`: shared domain model.
-- `src/core/modelGateway.ts`: provider config, model discovery, capability inference.
-- `src/core/agentOrchestrator.ts`: deterministic project generation and roundtable flows.
-- `src/core/workspaceRuntime.ts`: shared tool approval and command safety policy.
-- `src/core/memoryKnowledge.ts`: memory and knowledge store primitives.
-- `src/core/docsResearch.ts`: official docs research and Integration Note generation.
-- `src/server/workspaceRuntime.node.ts`: real filesystem/command runtime.
-- `src/server/index.ts`: local API server.
-- `docs/progress/implementation-log.md`: chronological implementation notes.
+11 specialized agents with system prompts:
 
-## Demo Flow
+1. 主持 Agent (Moderator) - Coordinates discussions
+2. 产品 Agent (Product) - Requirements analysis
+3. 架构 Agent (Architecture) - Technical design
+4. 开发 Agent (Development) - Full-stack coding
+5. UI Agent - Interface design
+6. 测试 Agent (Testing) - QA and testing
+7. 文档 Agent (Documentation) - Documentation writing
+8. 评审 Agent (Review) - Code review
+9. 反方 Agent (Critic) - Devil's advocate
+10. 研究 Agent (Researcher) - Technical research
+11. 编码 Agent (Coder) - Quick code implementation
 
-1. Run `npm run dev`.
-2. Open `http://127.0.0.1:5173/`.
-3. Click `生成项目原型`.
-4. The UI calls `POST http://127.0.0.1:8787/api/demo/run`.
-5. The API creates `.agent-workspaces/ai-resume-optimizer-*`.
-6. Generated files include `package.json`, `index.html`, `src/App.tsx`, `src/main.tsx`, `README.md`, and `docs/architecture.md`.
+## How To Use
 
-If the API is not running, the UI falls back to an in-browser deterministic flow and displays a notice.
+1. Start: `npm run dev`
+2. Open: `http://127.0.0.1:5173/`
+3. Configure: Go to Settings, add API key for a provider
+4. Chat: Create a new conversation, select an agent, start chatting
+5. Roundtable: Go to roundtable view, select agents and topic
+6. Projects: Use project templates for quick start
+7. Approvals: Review and approve/deny dangerous operations
 
 ## Current Limits
 
-- Agent behavior is deterministic; it does not yet call real LLMs.
-- Provider model discovery logic is implemented, but credentials and model management UI are still basic.
-- RAG uses simple local scoring, not vector storage.
-- Node runtime can write real files and run approved commands, but the UI does not yet expose a full approval queue experience for arbitrary commands.
-- Docker sandboxing and team features are intentionally deferred.
+- Conversations stored in localStorage (browser-only).
+- Server stores conversations in memory (lost on restart).
+- No user authentication or multi-tenancy.
+- No Docker sandbox for command execution.
+- RAG uses keyword scoring, not vector search.
+- No real-time collaboration between users.
 
-## Next Engineering Steps
+## Next Steps
 
-1. Add persistent storage for providers, runs, approvals, memory, and knowledge.
-2. Wire real model calls through `ModelGateway`.
-3. Add provider settings UI with credential test and model refresh.
-4. Replace deterministic project generation with agent/tool loop.
-5. Add real approval queue for install/run/delete/network actions.
-6. Add workspace diff view and merge/export actions.
-7. Replace simple retrieval with sqlite-vec/LanceDB.
-8. Add Docker sandbox runtime behind the same runtime interface.
+1. Add persistent storage (SQLite) for conversations and projects.
+2. Add user authentication.
+3. Add Docker sandbox for safe command execution.
+4. Replace keyword RAG with vector search (sqlite-vec/LanceDB).
+5. Add workflow canvas for visual flow design.
+6. Add team collaboration features.
+7. Add cost tracking and token usage dashboard.
+8. Add file upload and attachment support in chat.

@@ -1,4 +1,5 @@
 import type { ToolCallRecord } from "./types";
+import { isDangerousCommand, compressOutput } from "./toolRuntime";
 
 export type ToolAction =
   | { type: "write-file"; path: string }
@@ -13,31 +14,17 @@ export function needsApproval(action: ToolAction): boolean {
   return action.type !== "write-file";
 }
 
-export function isDangerousCommand(command: string): boolean {
-  const normalized = command.toLowerCase();
-  return [
-    /rm\s+-rf\s+\//,
-    /curl.+\|\s*(sh|bash)/,
-    /wget.+\|\s*(sh|bash)/,
-    />\s*\/dev\/(sda|disk)/,
-    /sudo\s+/,
-    /chmod\s+-r\s+777\s+\//
-  ].some((pattern) => pattern.test(normalized));
-}
+export { isDangerousCommand };
 
 export function createWorkspaceRuntime(id: string) {
   const files = new Map<string, string>();
   const toolCalls: ToolCallRecord[] = [];
   const assertSafePath = (path: string) => {
-    if (path.startsWith("/") || path.includes("..")) {
-      throw new Error("Path is outside workspace");
-    }
+    if (path.startsWith("/") || path.includes("..")) throw new Error("Path is outside workspace");
   };
 
   return {
-    id,
-    files,
-    toolCalls,
+    id, files, toolCalls,
     writeFile(path: string, content: string): ToolCallRecord {
       assertSafePath(path);
       files.set(path, content);
@@ -59,37 +46,23 @@ export function createWorkspaceRuntime(id: string) {
       }
       if (isDangerousCommand(input.command)) throw new Error("Dangerous command blocked");
       const call = makeToolCall({
-        type: "execute-command",
-        command: input.command,
+        type: "execute-command", command: input.command,
         status: input.exitCode === 0 ? "completed" : "failed",
-        stdout: compressOutput(input.stdout),
-        stderr: compressOutput(input.stderr),
-        exitCode: input.exitCode,
-        workingDirectory: id
+        stdout: compressOutput(input.stdout), stderr: compressOutput(input.stderr),
+        exitCode: input.exitCode, workingDirectory: id,
       });
       toolCalls.push(call);
       return call;
-    }
+    },
   };
-}
-
-export function compressOutput(output: string, maxLength = 4000): string {
-  if (output.length <= maxLength) return output;
-  return `${output.slice(0, maxLength)}\n...[truncated ${output.length - maxLength} chars]`;
 }
 
 function makeToolCall(input: Partial<ToolCallRecord> & Pick<ToolCallRecord, "type" | "status" | "workingDirectory">): ToolCallRecord {
   return {
     id: `tool-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-    type: input.type,
-    path: input.path,
-    command: input.command,
-    status: input.status,
-    stdout: input.stdout,
-    stderr: input.stderr,
-    exitCode: input.exitCode,
-    workingDirectory: input.workingDirectory,
-    timeoutMs: 30000,
-    createdAt: new Date().toISOString()
+    type: input.type, path: input.path, command: input.command,
+    status: input.status, stdout: input.stdout, stderr: input.stderr,
+    exitCode: input.exitCode, workingDirectory: input.workingDirectory,
+    timeoutMs: 30000, createdAt: new Date().toISOString(),
   };
 }

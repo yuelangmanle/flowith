@@ -1,69 +1,65 @@
+import type { AgentConfig, ApprovalRequest, Conversation, ProviderConfig, ModelConfig, AppView } from "./types";
 import { createDefaultProviders } from "./modelGateway";
-import { runRoundtable, type ProjectGenerationRun } from "./agentOrchestrator";
-import type { ApprovalRequest, ProviderConfig } from "./types";
+import { loadConversations, loadProviders, saveProviders, saveConversation } from "./persistence";
+import { DEFAULT_AGENTS } from "./agentConfig";
 
 export interface AppState {
-  activeView: "workspace" | "settings";
-  providers: Array<ProviderConfig & { modelsDiscovered?: number }>;
-  currentRun?: Pick<ProjectGenerationRun, "id" | "status" | "clarifyingQuestions" | "logs">;
+  activeView: AppView;
+  providers: ProviderConfig[];
+  models: ModelConfig[];
+  conversations: Conversation[];
+  activeConversationId: string | null;
+  agents: AgentConfig[];
   approvals: ApprovalRequest[];
-  roundtable?: ReturnType<typeof runRoundtable>;
+  sidebarOpen: boolean;
 }
 
 export type AppAction =
-  | { type: "run-demo" }
-  | { type: "approve-next" }
-  | { type: "refresh-provider"; providerId: string; modelCount: number }
-  | { type: "start-roundtable" };
+  | { type: "set-view"; view: AppView }
+  | { type: "set-conversations"; conversations: Conversation[] }
+  | { type: "set-active-conversation"; id: string | null }
+  | { type: "update-provider"; provider: ProviderConfig }
+  | { type: "set-models"; models: ModelConfig[] }
+  | { type: "set-agents"; agents: AgentConfig[] }
+  | { type: "toggle-sidebar" };
 
 export function createInitialAppState(): AppState {
+  const savedProviders = loadProviders();
+  const providers = savedProviders ?? createDefaultProviders();
   return {
-    activeView: "workspace",
-    providers: createDefaultProviders(),
-    approvals: []
+    activeView: "chat",
+    providers,
+    models: [],
+    conversations: loadConversations(),
+    activeConversationId: null,
+    agents: [...DEFAULT_AGENTS],
+    approvals: [],
+    sidebarOpen: true,
   };
 }
 
 export function reduceAppState(state: AppState, action: AppAction): AppState {
   switch (action.type) {
-    case "run-demo": {
-      const approvals: ApprovalRequest[] = [
-        {
-          id: "approval-install",
-          type: "install-dependency",
-          agent: "开发 Agent",
-          reason: "安装项目依赖。",
-          command: "npm install",
-          risk: "medium",
-          status: "pending"
-        }
-      ];
-      return {
-        ...state,
-        currentRun: {
-          id: "run-ai-resume",
-          status: "waiting-for-approval",
-          clarifyingQuestions: ["目标用户？", "是否登录？", "是否接真实模型？", "是否保存历史？"],
-          logs: ["计划已生成，等待审批危险动作。"]
-        },
-        approvals
-      };
+    case "set-view":
+      return { ...state, activeView: action.view };
+    case "set-conversations":
+      return { ...state, conversations: action.conversations };
+    case "set-active-conversation":
+      return { ...state, activeConversationId: action.id };
+    case "update-provider": {
+      const updated = state.providers.map((p) =>
+        p.id === action.provider.id ? action.provider : p
+      );
+      saveProviders(updated);
+      return { ...state, providers: updated };
     }
-    case "approve-next":
-      return {
-        ...state,
-        approvals: state.approvals.map((approval, index) => index === 0 ? { ...approval, status: "approved" } : approval)
-      };
-    case "refresh-provider":
-      return {
-        ...state,
-        providers: state.providers.map((provider) => provider.id === action.providerId ? { ...provider, modelsDiscovered: action.modelCount } : provider)
-      };
-    case "start-roundtable":
-      return {
-        ...state,
-        roundtable: runRoundtable({ topic: "如何改进 AI 简历优化工具", rounds: 3, accepted: true })
-      };
+    case "set-models":
+      return { ...state, models: action.models };
+    case "set-agents":
+      return { ...state, agents: action.agents };
+    case "toggle-sidebar":
+      return { ...state, sidebarOpen: !state.sidebarOpen };
+    default:
+      return state;
   }
 }
-
