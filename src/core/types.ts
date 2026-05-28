@@ -139,6 +139,8 @@ export interface Conversation {
   updatedAt: string;
   projectId?: string;
   metadata?: Record<string, unknown>;
+  pinned?: boolean;
+  branchedFrom?: { convId: string; messageId: string };
 }
 
 // ─── Tool ───────────────────────────────────────────────────────

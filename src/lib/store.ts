@@ -86,6 +86,8 @@ interface AppState {
   syncConversationsToServer: () => void;
   createConversation: (type?: Conversation["type"], title?: string) => Conversation;
   deleteConversation: (id: string) => void;
+  pinConversation: (id: string) => void;
+  branchConversation: (convId: string, messageId: string) => Conversation;
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -199,5 +201,40 @@ export const useStore = create<AppState>((set, get) => ({
       try { apiFetch("/api/conversations", { method: "PUT", body: JSON.stringify({ conversations: next }) }); } catch {}
       return { conversations: next, activeConvId: s.activeConvId === id ? null : s.activeConvId };
     });
+  },
+
+  pinConversation: (id) => {
+    set((s) => {
+      const next = s.conversations.map((c) => c.id === id ? { ...c, pinned: !c.pinned } : c);
+      const conv = next.find((c) => c.id === id);
+      if (conv) saveConversation(conv);
+      try { apiFetch("/api/conversations", { method: "PUT", body: JSON.stringify({ conversations: next }) }); } catch {}
+      return { conversations: next };
+    });
+  },
+
+  branchConversation: (convId, messageId) => {
+    const s = get();
+    const origConv = s.conversations.find((c) => c.id === convId);
+    if (!origConv) return s.createConversation("chat", "分支对话");
+    const msgIdx = origConv.messages.findIndex((m) => m.id === messageId);
+    const branchMessages = msgIdx >= 0 ? origConv.messages.slice(0, msgIdx + 1) : [];
+    const newConv = {
+      id: uid(),
+      title: `分支: ${origConv.title}`,
+      type: "chat" as const,
+      agentIds: origConv.agentIds,
+      messages: branchMessages,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      branchedFrom: { convId, messageId },
+    };
+    set((prev) => {
+      const next = [newConv, ...prev.conversations];
+      saveConversation(newConv);
+      try { apiFetch("/api/conversations", { method: "PUT", body: JSON.stringify({ conversations: next }) }); } catch {}
+      return { conversations: next, activeConvId: newConv.id };
+    });
+    return newConv;
   },
 }));

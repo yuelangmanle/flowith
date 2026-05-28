@@ -214,6 +214,7 @@ body {
 
 .conv-item:hover { background: var(--bg-hover); }
 .conv-item.active { background: var(--primary-dim); color: var(--text-primary); }
+.conv-item.pinned { border-left: 2px solid var(--primary); }
 .conv-item .conv-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .conv-item .conv-type {
   font-size: 10px;

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Copy, ExternalLink, Image, Loader2, Play, RefreshCw, Search, Send, Square, Volume2, VolumeX } from "lucide-react";
+import { ChevronDown, ChevronUp, Copy, ExternalLink, GitBranch, Image, Loader2, Play, RefreshCw, Search, Send, Square, StopCircle, Volume2, VolumeX, X, ZoomIn } from "lucide-react";
 import { useStore } from "../lib/store";
 import { apiFetch, formatTime, getProviderIcon, uid } from "../lib/shared";
 import { saveProviders, saveConversation } from "../core/persistence";
@@ -17,6 +17,7 @@ export function ChatView() {
     ttsEnabled, setTtsEnabled, ttsPlaying, setTtsPlaying,
     getEffectiveConfig, createConversation, setView, showToast,
     syncProvidersToServer,
+    branchConversation,
   } = store;
 
   const activeConversation = conversations.find((c) => c.id === activeConvId) ?? null;
@@ -28,10 +29,11 @@ export function ChatView() {
   const lastSpokenMsgRef = useRef<string>("");
   const [continuousTts, setContinuousTts] = useState(false);
   const continuousTtsRef = useRef(false);
-  const [attachedImage, setAttachedImage] = useState<string | null>(null);  // preview data URL
-  const [rawFile, setRawFile] = useState<File | null>(null);                 // original file for upload
+  const [attachedImages, setAttachedImages] = useState<Array<{ dataUrl: string; rawFile: File; info: string }>>([]);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);  // lightbox
   const [attachedFiles, setAttachedFiles] = useState<Array<{ name: string; type: string; size: number; content?: string; base64?: string }>>([]);
-  const [imageInfo, setImageInfo] = useState<string>("");
+  const abortRef = useRef<AbortController | null>(null);
+  const [expandedMsgs, setExpandedMsgs] = useState<Set<string>>(new Set());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatAreaRef = useRef<HTMLDivElement>(null);
 
@@ -77,12 +79,9 @@ export function ChatView() {
 
   const processFile = async (file: File) => {
     if (file.type.startsWith("image/")) {
-      // Store raw file for original-first upload, create preview
-      setRawFile(file);
       const reader = new FileReader();
       reader.onload = () => {
-        setAttachedImage(reader.result as string);
-        setImageInfo(`${file.name} · ${formatBytes(file.size)} (原图)`);
+        setAttachedImages((prev) => [...prev, { dataUrl: reader.result as string, rawFile: file, info: `${file.name} · ${formatBytes(file.size)}` }]);
       };
       reader.readAsDataURL(file);
     } else {
@@ -154,6 +153,73 @@ export function ChatView() {
     );
   };
 
+  const renderMessageContent = (content: string, msgId: string) => {
+    const COLLAPSE_THRESHOLD = 800; // chars
+    const isLong = content.length > COLLAPSE_THRESHOLD;
+    const isExpanded = expandedMsgs.has(msgId);
+
+    // Parse code blocks: ```lang\ncode\n```
+    const parts = content.split(/(```[\s\S]*?```)/g);
+    const rendered = parts.map((part, i) => {
+      const codeMatch = part.match(/^```(\w*)\n?([\s\S]*?)```$/);
+      if (codeMatch) {
+        const lang = codeMatch[1] || "";
+        const code = codeMatch[2].trim();
+        return (
+          <div key={i} style={{ position: "relative", margin: "6px 0", borderRadius: 8, background: "#1e1e2e", border: "1px solid var(--border)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 10px", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
+              <span style={{ fontSize: 11, color: "#888" }}>{lang || "code"}</span>
+              <button className="icon-btn" onClick={() => copyToClipboard(code)} title="复制代码" style={{ fontSize: 11, padding: "2px 6px", color: "#aaa" }}>
+                <Copy size={11} />
+              </button>
+            </div>
+            <pre style={{ margin: 0, padding: "10px 12px", overflow: "auto", fontSize: 12, lineHeight: 1.5, color: "#e4e4e7", fontFamily: "var(--font-mono, monospace)" }}>
+              <code>{code}</code>
+            </pre>
+          </div>
+        );
+      }
+      // Inline code: `code`
+      const inlineParts = part.split(/(`[^`]+`)/g);
+      return (
+        <span key={i}>
+          {inlineParts.map((ip, j) => {
+            const inlineMatch = ip.match(/^`(.+)`$/);
+            if (inlineMatch) {
+              return <code key={j} style={{ padding: "1px 5px", borderRadius: 4, background: "var(--bg)", border: "1px solid var(--border)", fontSize: "0.9em", fontFamily: "var(--font-mono, monospace)" }}>{inlineMatch[1]}</code>;
+            }
+            return <span key={j}>{ip}</span>;
+          })}
+        </span>
+      );
+    });
+
+    if (isLong && !isExpanded) {
+      return (
+        <div>
+          <div style={{ whiteSpace: "pre-wrap", maxHeight: 300, overflow: "hidden", position: "relative" }}>
+            {rendered}
+            <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 60, background: "linear-gradient(transparent, var(--bg-card))" }} />
+          </div>
+          <button className="icon-btn" onClick={() => setExpandedMsgs((prev) => new Set(prev).add(msgId))} style={{ fontSize: 12, color: "var(--primary)", marginTop: 4 }}>
+            <ChevronDown size={14} /> 展开全文 ({content.length} 字)
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div>
+        <div style={{ whiteSpace: "pre-wrap" }}>{rendered}</div>
+        {isLong && isExpanded && (
+          <button className="icon-btn" onClick={() => setExpandedMsgs((prev) => { const n = new Set(prev); n.delete(msgId); return n; })} style={{ fontSize: 12, color: "var(--primary)", marginTop: 4 }}>
+            <ChevronUp size={14} /> 收起
+          </button>
+        )}
+      </div>
+    );
+  };
+
   const copyToClipboard = async (text: string) => {
     try { await navigator.clipboard.writeText(text); showToast("已复制到剪贴板", "success"); } catch { showToast("复制失败", "error"); }
   };
@@ -213,30 +279,27 @@ export function ChatView() {
   }, []);
 
   const sendChatMessage = useCallback(async (message: string) => {
-    if (!message.trim() && !attachedImage && attachedFiles.length === 0) return;
-    let imageDataToSend = attachedImage;
-    let compressionInfo = "";
-
-    // If we have a raw file, send original first (no pre-compression)
-    if (rawFile && attachedImage) {
-      // Read raw file as base64
+    if (!message.trim() && attachedImages.length === 0 && attachedFiles.length === 0) return;
+    const imageDataList: string[] = [];
+    for (const img of attachedImages) {
       const reader = new FileReader();
-      imageDataToSend = await new Promise<string>((resolve) => {
+      const dataUrl = await new Promise<string>((resolve) => {
         reader.onload = () => resolve(reader.result as string);
-        reader.readAsDataURL(rawFile);
+        reader.readAsDataURL(img.rawFile);
       });
+      imageDataList.push(dataUrl);
     }
 
     const fileNames = attachedFiles.map((f) => f.name).join(", ");
     const prefix = [
-      imageDataToSend ? "[图片已附加] " : "",
+      imageDataList.length > 0 ? `[${imageDataList.length}张图片已附加] ` : "",
       fileNames ? `[文件: ${fileNames}] ` : "",
     ].join("");
     const fullMessage = prefix + message;
     let conv = activeConversation;
     if (!conv) conv = createConversation("chat", message.slice(0, 30));
 
-    const userMsg: ChatMessage = { id: uid(), role: "user", content: fullMessage, imageData: imageDataToSend ?? undefined, attachedFiles: attachedFiles.length > 0 ? attachedFiles.map((f) => ({ name: f.name, type: f.type, size: f.size, content: f.content })) : undefined, createdAt: new Date().toISOString() };
+    const userMsg: ChatMessage = { id: uid(), role: "user", content: fullMessage, imageData: imageDataList[0] ?? undefined, attachedFiles: attachedFiles.length > 0 ? attachedFiles.map((f) => ({ name: f.name, type: f.type, size: f.size, content: f.content })) : undefined, createdAt: new Date().toISOString() };
     const updatedMessages = [...conv.messages, userMsg];
     const updatedConv = { ...conv, messages: updatedMessages, updatedAt: new Date().toISOString() };
     setConversations((prev) => {
@@ -247,10 +310,10 @@ export function ChatView() {
     });
 
     setChatInput("");
-    setAttachedImage(null);
-    setRawFile(null);
+    setAttachedImages([]);
     setAttachedFiles([]);
-    setImageInfo("");
+    const controller = new AbortController();
+    abortRef.current = controller;
     setStreaming(true);
     setStreamingContent("");
     setStreamingAgent(null);
@@ -259,13 +322,14 @@ export function ChatView() {
     try {
       const resp = await apiFetch("/api/chat", {
         method: "POST",
+        signal: controller.signal,
         body: JSON.stringify({
         conversationId: conv.id,
         message: fullMessage,
         agentId: selectedAgentId,
         providerId: cfg.providerId,
         model: cfg.modelId,
-        imageData: imageDataToSend ?? undefined,
+        imageData: imageDataList[0] ?? undefined,
         attachedFiles: attachedFiles.length > 0 ? attachedFiles.map((f) => ({ name: f.name, type: f.type, size: f.size, content: f.content })) : undefined,
       }),
       });
@@ -312,10 +376,10 @@ export function ChatView() {
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
       // If failure might be due to image size, try compressing and retrying
-      if (rawFile && imageDataToSend && (errMsg.includes("413") || errMsg.includes("too large") || errMsg.includes("payload") || errMsg.includes("size"))) {
+      if (attachedImages.length > 0 && (errMsg.includes("413") || errMsg.includes("too large") || errMsg.includes("payload") || errMsg.includes("size"))) {
         try {
           showToast("原图过大，正在压缩重试...", "info");
-          const compressed = await compressImage(rawFile, { maxDimension: 1024, quality: 0.85, maxBytes: 2 * 1024 * 1024 });
+          const compressed = await compressImage(attachedImages[0].rawFile, { maxDimension: 1024, quality: 0.85, maxBytes: 2 * 1024 * 1024 });
           const retryResp = await apiFetch("/api/chat", {
             method: "POST",
             body: JSON.stringify({ conversationId: conv.id, message: fullMessage, agentId: selectedAgentId, providerId: cfg.providerId, model: cfg.modelId, imageData: compressed.dataUrl, attachedFiles: attachedFiles.length > 0 ? attachedFiles.map((f) => ({ name: f.name, type: f.type, size: f.size, content: f.content })) : undefined }),
@@ -328,8 +392,8 @@ export function ChatView() {
             const finalConv2 = { ...updatedConv, messages: [...updatedMessages, assistantMsg], updatedAt: new Date().toISOString() };
             setConversations((prev) => prev.map((c) => c.id === finalConv2.id ? finalConv2 : c));
             saveConversation(finalConv2);
-            compressionInfo = ` (已压缩: ${formatBytes(compressed.originalSize)} → ${formatBytes(compressed.compressedSize)})`;
-            showToast(`压缩重试成功${compressionInfo}`, "success");
+            const compInfo = ` (已压缩: ${formatBytes(compressed.originalSize)} → ${formatBytes(compressed.compressedSize)})`;
+            showToast(`压缩重试成功${compInfo}`, "success");
             return;
           }
         } catch {
@@ -345,7 +409,7 @@ export function ChatView() {
       setStreamingContent("");
       setStreamingAgent(null);
     }
-  }, [activeConversation, streaming, selectedAgentId, agents, attachedImage, getEffectiveConfig, createConversation, setConversations, showToast]);
+  }, [activeConversation, streaming, selectedAgentId, agents, attachedImages, getEffectiveConfig, createConversation, setConversations, showToast]);
 
   const hasConfiguredProvider = providers.some((p) => p.enabled && (p.apiKey || p.type === "ollama"));
   const availableModels = selectedProviderId
@@ -418,7 +482,7 @@ export function ChatView() {
                 )}
                 {msg.imageData && (
                   <div style={{ marginBottom: 6 }}>
-                    <img src={msg.imageData} alt="attached" style={{ maxWidth: 300, maxHeight: 200, borderRadius: 8, cursor: "pointer", objectFit: "contain" }} onClick={() => window.open(msg.imageData, "_blank")} />
+                    <img src={msg.imageData} alt="attached" style={{ maxWidth: 300, maxHeight: 200, borderRadius: 8, cursor: "pointer", objectFit: "contain" }} onClick={() => setPreviewImage(msg.imageData!)} />
                   </div>
                 )}
                 {msg.attachedFiles && msg.attachedFiles.length > 0 && (
@@ -428,7 +492,7 @@ export function ChatView() {
                     ))}
                   </div>
                 )}
-                <div style={{ whiteSpace: "pre-wrap" }}>{msg.content.replace(/\[图片已附加\]\s*/g, "").replace(/\[文件:[^\]]+\]\s*/g, "")}</div>
+                {renderMessageContent(msg.content.replace(/\[图片已附加\]\s*/g, "").replace(/\[文件:[^\]]+\]\s*/g, ""), msg.id)}
                 {msg.role === "assistant" && renderCitations(msg.content)}
                 {msg.role === "assistant" && (
                   <div style={{ display: "flex", gap: 4, marginTop: 4, alignItems: "center" }}>
@@ -444,6 +508,14 @@ export function ChatView() {
                       }
                     }} title="重新生成" style={{ fontSize: 11, padding: "2px 4px", display: "inline-flex", alignItems: "center" }}>
                       <RefreshCw size={12} />
+                    </button>
+                    <button className="icon-btn" onClick={() => {
+                      if (activeConvId) {
+                        const branched = branchConversation(activeConvId, msg.id);
+                        showToast(`已创建分支对话: ${branched.title}`, "success");
+                      }
+                    }} title="从此消息分支" style={{ fontSize: 11, padding: "2px 4px", display: "inline-flex", alignItems: "center" }}>
+                      <GitBranch size={12} />
                     </button>
                     {(ttsEnabled || agentTTSConfigs.find((c) => c.agentId === msg.agentId)?.enabled) && (
                       <button className="icon-btn" style={{ fontSize: 11, padding: "2px 4px", display: "inline-flex", alignItems: "center" }} onClick={() => speakText(msg.content, msg.agentId)} disabled={ttsPlaying} title="朗读此消息">
@@ -477,18 +549,15 @@ export function ChatView() {
         <div ref={messagesEndRef} />
       </div>
       <div className="chat-input-area">
-        {(attachedImage || attachedFiles.length > 0) && (
+        {(attachedImages.length > 0 || attachedFiles.length > 0) && (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8, padding: 8, borderRadius: 8, background: "var(--bg-card)", border: "1px solid var(--border)" }}>
-            {attachedImage && (
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <img src={attachedImage} alt="预览" style={{ maxWidth: 60, maxHeight: 45, borderRadius: 4, objectFit: "cover" }} />
-                <div>
-                  <span style={{ fontSize: 11, color: "var(--text-muted)" }}>图片</span>
-                  {imageInfo && <span style={{ fontSize: 10, color: "var(--text-muted)", display: "block" }}>{imageInfo}</span>}
-                </div>
-                <button className="icon-btn" onClick={() => { setAttachedImage(null); setRawFile(null); setImageInfo(""); }} style={{ fontSize: 11 }}>✕</button>
+            {attachedImages.map((img, idx) => (
+              <div key={idx} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <img src={img.dataUrl} alt="预览" style={{ maxWidth: 60, maxHeight: 45, borderRadius: 4, objectFit: "cover", cursor: "pointer" }} onClick={() => setPreviewImage(img.dataUrl)} />
+                <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{img.info}</span>
+                <button className="icon-btn" onClick={() => setAttachedImages((prev) => prev.filter((_, i) => i !== idx))} style={{ fontSize: 11 }}>✕</button>
               </div>
-            )}
+            ))}
             {attachedFiles.map((f, i) => (
               <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, padding: "2px 6px", borderRadius: 4, background: "var(--bg)", border: "1px solid var(--border)" }}>
                 <span style={{ fontSize: 11 }}>📄 {f.name}</span>
@@ -504,9 +573,15 @@ export function ChatView() {
             <Image size={16} />
           </button>
           <textarea className="chat-input" placeholder={`与 ${agents.find((a) => a.id === selectedAgentId)?.name ?? "Agent"} 对话...`} value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChatMessage(chatInput); } }} onPaste={handlePaste} rows={1} disabled={streaming} />
-          <button className="primary" onClick={() => sendChatMessage(chatInput)} disabled={streaming || (!chatInput.trim() && !attachedImage)} style={{ borderRadius: 10, padding: "10px 16px" }}>
-            {streaming ? <Loader2 size={16} className="spin" /> : <Send size={16} />}
-          </button>
+          {streaming ? (
+            <button className="primary" onClick={() => { abortRef.current?.abort(); setStreaming(false); setStreamingContent(""); setStreamingAgent(null); }} style={{ borderRadius: 10, padding: "10px 16px", background: "var(--accent)" }}>
+              <StopCircle size={16} />
+            </button>
+          ) : (
+            <button className="primary" onClick={() => sendChatMessage(chatInput)} disabled={!chatInput.trim() && attachedImages.length === 0} style={{ borderRadius: 10, padding: "10px 16px" }}>
+              <Send size={16} />
+            </button>
+          )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
           <div className="agent-selector" style={{ flex: 1, margin: 0 }}>
@@ -583,6 +658,14 @@ export function ChatView() {
           </div>
         </div>
       </div>
+      {previewImage && (
+        <div className="image-lightbox" onClick={() => setPreviewImage(null)} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-out" }}>
+          <button onClick={() => setPreviewImage(null)} style={{ position: "absolute", top: 16, right: 16, background: "none", border: "none", color: "white", cursor: "pointer", zIndex: 1001 }}>
+            <X size={24} />
+          </button>
+          <img src={previewImage} alt="preview" style={{ maxWidth: "90vw", maxHeight: "90vh", objectFit: "contain", borderRadius: 8 }} onClick={(e) => e.stopPropagation()} />
+        </div>
+      )}
     </div>
   );
 }

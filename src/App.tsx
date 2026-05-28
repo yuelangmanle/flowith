@@ -1,7 +1,7 @@
 import { useEffect, useState, Component, type ReactNode } from "react";
 import {
   Bot, Code2, Download, FolderOpen, Loader2, MessageSquare, MessageSquarePlus, PackagePlus,
-  PanelLeftClose, PanelLeftOpen, Search, Settings, Trash2, Users,
+  PanelLeftClose, PanelLeftOpen, Pin, Search, Settings, Trash2, Users,
 } from "lucide-react";
 import { useStore } from "./lib/store";
 import { apiFetch } from "./lib/shared";
@@ -40,7 +40,7 @@ export function App() {
     providers, setProviders, models, setModels, conversations,
     agents, setAgents, setAgentModelConfigs, setAgentTTSConfigs,
     setSelectedAgentId,
-    setServerConnected, serverConnected, createConversation, deleteConversation,
+    setServerConnected, serverConnected, createConversation, deleteConversation, pinConversation,
     toast, darkMode, toggleDarkMode,
   } = store;
 
@@ -180,10 +180,12 @@ export function App() {
                 </div>
               </div>
               <div className="conversation-list">
-                {conversations.filter((c) => !convSearch || c.title.toLowerCase().includes(convSearch.toLowerCase()) || c.messages.some((m) => m.content.toLowerCase().includes(convSearch.toLowerCase()))).map((c) => (
-                  <div key={c.id} className={`conv-item ${store.activeConvId === c.id ? "active" : ""}`} onClick={() => { store.setActiveConvId(c.id); setView("chat"); }}>
+                {[...conversations].sort((a, b) => { if (a.pinned && !b.pinned) return -1; if (!a.pinned && b.pinned) return 1; return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(); }).filter((c) => !convSearch || c.title.toLowerCase().includes(convSearch.toLowerCase()) || c.messages.some((m) => m.content.toLowerCase().includes(convSearch.toLowerCase()))).map((c) => (
+                  <div key={c.id} className={`conv-item ${store.activeConvId === c.id ? "active" : ""} ${c.pinned ? "pinned" : ""}`} onClick={() => { store.setActiveConvId(c.id); setView("chat"); }}>
+                    {c.pinned && <Pin size={10} style={{ color: "var(--primary)", flexShrink: 0 }} />}
                     <span className="conv-title">{c.title}</span>
-                    <span className="conv-type">{c.type === "roundtable" ? "圆桌" : c.type === "group-chat" ? "群聊" : "对话"}</span>
+                    <span className="conv-type">{c.type === "roundtable" ? "圆桌" : c.type === "group-chat" ? "群聊" : c.branchedFrom ? "分支" : "对话"}</span>
+                    <button className="icon-btn" onClick={(e) => { e.stopPropagation(); pinConversation(c.id); }} title={c.pinned ? "取消置顶" : "置顶"} style={{ padding: "2px 4px", color: c.pinned ? "var(--primary)" : "var(--text-muted)" }}><Pin size={10} /></button>
                     <button className="icon-btn" onClick={(e) => { e.stopPropagation(); exportConversation(c); }} title="导出" style={{ padding: "2px 4px" }}><Download size={10} /></button>
                     <button className="delete-btn" onClick={(e) => { e.stopPropagation(); deleteConversation(c.id); }}><Trash2 size={12} /></button>
                   </div>
