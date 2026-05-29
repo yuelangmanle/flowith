@@ -15,6 +15,7 @@ import { RightPanel } from "./views/RightPanel";
 import { SkillsView } from "./views/SkillsView";
 import type { AgentTTSConfig, ModelConfig, Skill, TTSProviderConfig } from "./core/types";
 import { useKeyboard } from "./lib/useKeyboard";
+import { SunIcon, MoonIcon, BotIcon, UserIcon, ChatIcon } from "./components/icons";
 import { SetupWizard } from "./views/SetupWizard";
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: string }> {
@@ -52,7 +53,7 @@ export function App() {
 
   const exportConversation = (conv: typeof conversations[0]) => {
     const md = `# ${conv.title}\n\n` + conv.messages.map((m) => {
-      const role = m.role === "user" ? "👤 User" : m.agentName ? `${m.agentAvatar} ${m.agentName}` : "🤖 Assistant";
+      const role = m.role === "user" ? "User" : m.agentName ? `${m.agentName}` : "Assistant";
       return `### ${role}\n${m.content}\n`;
     }).join("\n---\n\n");
     const blob = new Blob([md], { type: "text/markdown" });
@@ -167,7 +168,7 @@ export function App() {
               <span className="status-pill info">{agents.length} Agents</span>
             </div>
             <button className="icon-btn" onClick={toggleDarkMode} title={darkMode ? "浅色模式" : "深色模式"}>
-              {darkMode ? "☀️" : "🌙"}
+              {darkMode ? <SunIcon size={16} /> : <MoonIcon size={16} />}
             </button>
             <button className="icon-btn" onClick={toggleRightPanel}>
               <PanelLeftOpen size={18} style={{ transform: "scaleX(-1)" }} />
@@ -190,7 +191,7 @@ export function App() {
               <div className="sidebar-section">对话历史</div>
               {/* 快速 1v1：横向头像行 */}
               <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "2px 8px 4px", flexShrink: 0, overflowX: "auto" }}>
-                <button className="quick-chat-avatar" title="自由对话（无预设）" onClick={() => { createConversation("chat", "自由对话"); setSelectedAgentId(""); setView("chat"); }}>💬</button>
+                <button className="quick-chat-avatar" title="自由对话（无预设）" onClick={() => { createConversation("chat", "自由对话"); setSelectedAgentId(""); setView("chat"); }}><ChatIcon size={18} /></button>
                 {agents.map((a) => (
                   <button key={a.id} className="quick-chat-avatar" title={a.name} onClick={() => { createConversation("chat", `与${a.name}对话`); setSelectedAgentId(a.id); setView("chat"); }}>
                     {a.avatar}

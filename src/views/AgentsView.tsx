@@ -10,7 +10,7 @@ export function AgentsView() {
   const [newName, setNewName] = useState("");
   const [newRole, setNewRole] = useState<AgentConfig["role"]>("coder");
   const [newPrompt, setNewPrompt] = useState("");
-  const [newAvatar, setNewAvatar] = useState("🤖");
+  const [newAvatar, setNewAvatar] = useState("✦");
 
   const ttsEnabledGlobal = useStore((s) => s.ttsEnabled);
   const setTtsEnabled = useStore((s) => s.setTtsEnabled);
@@ -54,7 +54,7 @@ export function AgentsView() {
               <button className="primary" onClick={async () => {
                 if (!newName.trim()) return;
                 const resp = await apiFetch("/api/agents", { method: "POST", body: JSON.stringify({ name: newName, role: newRole, avatar: newAvatar, systemPrompt: newPrompt, goal: newPrompt.slice(0, 50) }) });
-                if (resp.ok) { const a = await resp.json() as AgentConfig; setAgents((prev) => [...prev, a]); setShowCreate(false); setNewName(""); setNewPrompt(""); setNewAvatar("🤖"); }
+                if (resp.ok) { const a = await resp.json() as AgentConfig; setAgents((prev) => [...prev, a]); setShowCreate(false); setNewName(""); setNewPrompt(""); setNewAvatar("✦"); }
               }}>创建</button>
               <button onClick={() => setShowCreate(false)}>取消</button>
             </div>
@@ -93,7 +93,7 @@ export function AgentsView() {
                 apiFetch("/api/agent-models", { method: "PUT", body: JSON.stringify({ configs: nc }) });
               }} style={{ padding: "3px 6px", borderRadius: 4, border: "1px solid var(--border)", fontSize: 11, background: "var(--bg-card)", maxWidth: 200 }}>
                 {!agentCfg && <option value="">{effectiveModel}</option>}
-                {agentCfg && models.filter((m) => m.providerId === agentCfg.providerId).map((m) => <option key={m.id} value={m.id}>{m.id} {m.capabilities.reasoning ? "🧠" : ""}{m.capabilities.fast ? "⚡" : ""}{m.capabilities.vision ? "👁" : ""}</option>)}
+                {agentCfg && models.filter((m) => m.providerId === agentCfg.providerId).map((m) => <option key={m.id} value={m.id}>{m.id} {m.capabilities.reasoning ? " [思考]" : ""}{m.capabilities.fast ? " [快]" : ""}{m.capabilities.vision ? " [视觉]" : ""}</option>)}
               </select>
               {agentCfg && <span style={{ fontSize: 10, color: "var(--primary)" }}>✓ 自定义</span>}
             </div>

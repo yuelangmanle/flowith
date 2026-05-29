@@ -10,11 +10,11 @@ const STEPS = [
 ];
 
 const PROVIDERS = [
-  { id: "deepseek", name: "DeepSeek", icon: "🟣", desc: "国产高性能模型，性价比极高", free: false, placeholder: "sk-..." },
-  { id: "xiaomi-mimo", name: "小米 MiMo", icon: "🔵", desc: "小米大模型，支持联网搜索", free: false, placeholder: "输入 MiMo API Key" },
-  { id: "ollama", name: "Ollama (本地)", icon: "🦙", desc: "本地运行开源模型，完全免费", free: true, placeholder: "" },
-  { id: "openai", name: "OpenAI", icon: "🟢", desc: "GPT-4o 等全球领先模型", free: false, placeholder: "sk-..." },
-  { id: "qwen", name: "通义千问", icon: "🟡", desc: "阿里云大模型，中文能力强", free: false, placeholder: "sk-..." },
+  { id: "deepseek", name: "DeepSeek", icon: "DS", desc: "国产高性能模型，性价比极高", free: false, placeholder: "sk-..." },
+  { id: "xiaomi-mimo", name: "小米 MiMo", icon: "MI", desc: "小米大模型，支持联网搜索", free: false, placeholder: "输入 MiMo API Key" },
+  { id: "ollama", name: "Ollama (本地)", icon: "OL", desc: "本地运行开源模型，完全免费", free: true, placeholder: "" },
+  { id: "openai", name: "OpenAI", icon: "AI", desc: "GPT-4o 等全球领先模型", free: false, placeholder: "sk-..." },
+  { id: "qwen", name: "通义千问", icon: "QN", desc: "阿里云大模型，中文能力强", free: false, placeholder: "sk-..." },
 ];
 
 interface Props {

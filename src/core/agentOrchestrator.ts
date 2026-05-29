@@ -266,7 +266,7 @@ export async function* streamAgentMessage(
     agentId: agent?.id ?? "free-chat",
     agentName: agent?.name ?? "AI 助手",
     agentColor: agent?.color ?? "#4ECDC4",
-    agentAvatar: agent?.avatar ?? "🤖",
+    agentAvatar: agent?.avatar ?? "✦",
   };
 
   yield* streamChatCompletion({ provider, model: modelId, messages: contextResult.messages, stream: true });

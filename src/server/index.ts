@@ -297,7 +297,7 @@ export async function createServer() {
         const newAgent = createUserAgent({
           name: body.name ?? "自定义 Agent",
           role: (body.role as AgentConfig["role"]) ?? "coder",
-          avatar: body.avatar ?? "🤖",
+          avatar: body.avatar ?? "✦",
           goal: body.goal ?? "",
           systemPrompt: body.systemPrompt ?? "你是一个 AI 助手。",
           tools: body.tools,

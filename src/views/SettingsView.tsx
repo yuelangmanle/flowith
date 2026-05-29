@@ -79,7 +79,7 @@ export function SettingsView() {
                 {!selectedProviderId && <option value="">请选择供应商</option>}
                 {selectedProviderId && models.filter((m) => m.providerId === selectedProviderId).length === 0 && <option value="">暂无模型，请先发现</option>}
                 {models.filter((m) => m.providerId === selectedProviderId).map((m) => (
-                  <option key={m.id} value={m.id}>{m.id} {m.capabilities.reasoning ? "🧠" : ""}{m.capabilities.fast ? "⚡" : ""}{m.capabilities.vision ? "👁" : ""}</option>
+                  <option key={m.id} value={m.id}>{m.id} {m.capabilities.reasoning ? " [思考]" : ""}{m.capabilities.fast ? " [快]" : ""}{m.capabilities.vision ? " [视觉]" : ""}</option>
                 ))}
               </select>
             </div>

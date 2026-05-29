@@ -6,6 +6,7 @@ import { saveProviders, saveConversation } from "../core/persistence";
 import { compressImage, formatBytes } from "../lib/imageCompress";
 import type { CompressResult } from "../lib/imageCompress";
 import type { ChatMessage } from "../core/types";
+import { UserIcon, BotIcon, BrainIcon, ZapIcon, EyeIcon, FileIcon, LinkIcon, ChatIcon } from "../components/icons";
 
 export function ChatView() {
   const store = useStore();
@@ -157,7 +158,7 @@ export function ChatView() {
     if (urls.length === 0) return null;
     return (
       <div style={{ marginTop: 6, padding: "4px 8px", borderRadius: 6, background: "var(--bg)", border: "1px solid var(--border)", fontSize: 11 }}>
-        <div style={{ color: "var(--text-muted)", marginBottom: 3, fontSize: 10 }}>📎 来源引用:</div>
+        <div style={{ color: "var(--text-muted)", marginBottom: 3, fontSize: 10 }}><LinkIcon size={10} /> 来源引用:</div>
         {urls.map((u, i) => (
           <a key={i} href={u.url} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 3, color: "var(--primary)", marginRight: 8, fontSize: 11 }}>
             <ExternalLink size={10} /> {u.text.slice(0, 40)}
@@ -424,7 +425,7 @@ export function ChatView() {
               if (currentEvent === "text" && data.content) {
                 fullContent += data.content;
                 setStreamingContent(fullContent);
-                if (data.agentName) setStreamingAgent({ id: data.agentId, name: data.agentName, color: data.agentColor, avatar: data.agentAvatar ?? "🤖" });
+                if (data.agentName) setStreamingAgent({ id: data.agentId, name: data.agentName, color: data.agentColor, avatar: data.agentAvatar ?? "✦" });
               } else if (currentEvent === "usage" && data.usage) {
                 // Track token usage from server SSE
                 if (activeConvId) {
@@ -508,7 +509,7 @@ export function ChatView() {
       </div>
       {/* Agent header for 1v1 context */}
       {(() => {
-        const currentAgent = agents.find((a) => a.id === selectedAgentId) ?? (selectedAgentId ? null : { id: "", name: "自由对话", avatar: "💬", role: "free" as const, color: "#4ECDC4", goal: "", systemPrompt: "" });
+        const currentAgent = agents.find((a) => a.id === selectedAgentId) ?? (selectedAgentId ? null : { id: "", name: "自由对话", avatar: "✦", role: "free" as const, color: "#4ECDC4", goal: "", systemPrompt: "" });
         if (!currentAgent) return null;
         return (
           <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 16px", borderBottom: "1px solid var(--border)", background: "var(--bg-card)" }}>
@@ -530,7 +531,7 @@ export function ChatView() {
       <div className="chat-messages">
         {(!activeConversation || activeConversation.messages.length === 0) && (
           <div className="empty-state">
-            <div className="empty-icon">🤖</div>
+            <div className="empty-icon"><BotIcon size={48} /></div>
             <div className="empty-text">开始对话</div>
             {!hasConfiguredProvider ? (
               <div className="notice" style={{ marginTop: 12, cursor: "pointer" }} onClick={() => setView("settings")}>
@@ -551,7 +552,7 @@ export function ChatView() {
         {activeConversation?.messages.map((msg) => (
           <div key={msg.id} className={`msg-row ${msg.role}`}>
             <div className="msg-avatar" style={{ background: msg.role === "user" ? "#4D96FF" : (msg.agentColor ?? "#4ECDC4") }}>
-              {msg.role === "user" ? "👤" : (msg.agentAvatar ?? "🤖")}
+              {msg.role === "user" ? <UserIcon size={16} /> : (msg.agentAvatar ?? <BotIcon size={16} />)}
             </div>
             <div>
               <div className="msg-bubble">
@@ -581,7 +582,7 @@ export function ChatView() {
                 {msg.attachedFiles && msg.attachedFiles.length > 0 && (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginBottom: 6 }}>
                     {msg.attachedFiles.map((f, i) => (
-                      <span key={i} style={{ fontSize: 11, padding: "2px 6px", borderRadius: 4, background: "var(--bg)", border: "1px solid var(--border)" }}>📄 {f.name}</span>
+                      <span key={i} style={{ fontSize: 11, padding: "2px 6px", borderRadius: 4, background: "var(--bg)", border: "1px solid var(--border)" }}><FileIcon size={12} /> {f.name}</span>
                     ))}
                   </div>
                 )}
@@ -629,7 +630,7 @@ export function ChatView() {
         ))}
         {streaming && streamingContent && (
           <div className="msg-row assistant">
-            <div className="msg-avatar" style={{ background: streamingAgent?.color ?? "#4ECDC4" }}>{streamingAgent?.avatar ?? "🤖"}</div>
+            <div className="msg-avatar" style={{ background: streamingAgent?.color ?? "#4ECDC4" }}>{streamingAgent?.avatar ?? <BotIcon size={16} />}</div>
             <div>
               <div className="msg-bubble">
                 {streamingAgent && <div className="msg-agent-name" style={{ color: streamingAgent.color }}>{streamingAgent.avatar} {streamingAgent.name}<span className="streaming-dot" /></div>}
@@ -642,7 +643,7 @@ export function ChatView() {
                     return (
                       <>
                         <div style={{ marginBottom: 6, padding: "6px 10px", borderRadius: 6, background: "var(--bg)", border: "1px solid var(--border)", fontSize: 11, color: "var(--text-secondary)" }}>
-                          <span style={{ marginRight: 4 }}>🧠</span>深度思考中... ({thinkText.length} 字)
+                          <span style={{ marginRight: 4 }}><BrainIcon size={14} /></span>深度思考中... ({thinkText.length} 字)
                         </div>
                         <div style={{ whiteSpace: "pre-wrap" }}>{mainText}<span className="streaming-dot" /></div>
                       </>
@@ -656,7 +657,7 @@ export function ChatView() {
         )}
         {streaming && !streamingContent && (
           <div className="msg-row assistant">
-            <div className="msg-avatar" style={{ background: "#4ECDC4" }}>🤖</div>
+            <div className="msg-avatar" style={{ background: "#4ECDC4", display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="4" y="6" width="16" height="14" rx="3" fill="currentColor"/><circle cx="9" cy="13" r="1.5" fill="white"/><circle cx="15" cy="13" r="1.5" fill="white"/><rect x="10" y="2" width="4" height="4" rx="2" fill="currentColor"/></svg></div>
             <div className="msg-bubble"><div className="typing-indicator"><span className="dot" /><span className="dot" /><span className="dot" /></div></div>
           </div>
         )}
@@ -674,7 +675,7 @@ export function ChatView() {
             ))}
             {attachedFiles.map((f, i) => (
               <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, padding: "2px 6px", borderRadius: 4, background: "var(--bg)", border: "1px solid var(--border)" }}>
-                <span style={{ fontSize: 11 }}>📄 {f.name}</span>
+                <span style={{ fontSize: 11 }}><FileIcon size={12} /> {f.name}</span>
                 <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{formatBytes(f.size)}</span>
                 <button className="icon-btn" onClick={() => setAttachedFiles((prev) => prev.filter((_, idx) => idx !== i))} style={{ fontSize: 10 }}>✕</button>
               </div>

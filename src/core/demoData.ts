@@ -48,21 +48,21 @@ export const projectTemplates = [
     name: "AI 简历优化",
     idea: "帮我做一个 AI 简历优化 Web 应用",
     stack: "Vite + React + TypeScript",
-    icon: "📄",
+    icon: "doc",
   },
   {
     id: "chat-app",
     name: "聊天应用",
     idea: "帮我做一个实时聊天 Web 应用",
     stack: "Next.js + TypeScript",
-    icon: "💬",
+    icon: "chat",
   },
   {
     id: "dashboard",
     name: "数据面板",
     idea: "帮我做一个数据可视化面板",
     stack: "Vite + React + TypeScript",
-    icon: "📊",
+    icon: "chart",
   },
   {
     id: "todo-app",
@@ -83,7 +83,7 @@ export const projectTemplates = [
     name: "落地页",
     idea: "帮我做一个产品落地页",
     stack: "Vite + React + TypeScript",
-    icon: "🚀",
+    icon: "rocket",
   },
 ];
 

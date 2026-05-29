@@ -26,10 +26,11 @@ export async function apiFetch(path: string, options?: RequestInit): Promise<Res
 }
 
 export function getProviderIcon(type: string): string {
+  // Returns a short label used as fallback; prefer getProviderIconComponent for rendering
   const icons: Record<string, string> = {
-    openai: "🟢", anthropic: "🟠", gemini: "🔵", deepseek: "🟣",
-    qwen: "🟡", moonshot: "🌙", ollama: "🦙", "openai-compatible": "⚪",
-    "xiaomi-mimo": "🔵",
+    openai: "AI", anthropic: "CL", gemini: "GM", deepseek: "DS",
+    qwen: "QN", moonshot: "MS", ollama: "OL", "openai-compatible": "AI",
+    "xiaomi-mimo": "MI",
   };
-  return icons[type] ?? "⚪";
+  return icons[type] ?? "AI";
 }
