@@ -114,7 +114,7 @@ jobs:
         run: ./gradlew assembleDebug --no-daemon --info 2>&1 | tail -100
 
       - name: Prepare APK for release
-        if: success()
+        if: always()
         run: |
           TAG="${{ github.ref_name }}"
           VERSION="${TAG#v}"
@@ -122,7 +122,7 @@ jobs:
           ls -lh "Flowith_${VERSION}_android.apk"
 
       - name: Upload APK to GitHub Release
-        if: success()
+        if: always()
         uses: softprops/action-gh-release@v2
         with:
           files: "Flowith_*_android.apk"
