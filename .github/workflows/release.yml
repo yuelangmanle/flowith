@@ -74,7 +74,7 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: Setup Java 17
+      - name: Setup Java 21
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
@@ -85,11 +85,10 @@ jobs:
 
       - name: Install Android SDK components
         run: |
-          sdkmanager --install "platform-tools" "platforms;android-36" "build-tools;36.0.0" 2>&1 | tail -5
-          echo "SDK components installed"
+          sdkmanager --install "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 
       - name: Accept Android SDK licenses
-        run: yes | sdkmanager --licenses 2>&1 | tail -5
+        run: yes | sdkmanager --licenses || true
 
       - name: Install dependencies
         run: npm ci
@@ -97,21 +96,21 @@ jobs:
       - name: Build frontend
         run: npx vite build
 
-      - name: Sync Capacitor Android
+      - name: Copy web assets to Android
         run: |
-          echo "=== Capacitor Sync ==="
-          npx cap sync android 2>&1
-          echo "=== Sync Complete ==="
+          mkdir -p android/app/src/main/assets/public
+          cp -r dist/* android/app/src/main/assets/public/
+          npx cap copy android
+
+      - name: Update Capacitor plugins
+        run: npx cap update android
 
       - name: Make Gradlew executable
         run: chmod +x android/gradlew
 
       - name: Build Android APK
         working-directory: android
-        run: |
-          echo "=== Building APK ==="
-          ./gradlew assembleDebug --stacktrace 2>&1 | tail -20
-          echo "=== Build Complete ==="
+        run: ./gradlew assembleDebug
 
       - name: Prepare APK for release
         run: |
@@ -165,15 +164,12 @@ jobs:
             }
           }
           EOF
-          echo "Updater JSON:"
-          cat latest.json
 
       - name: Update download page fallback version
         run: |
           TAG="${{ github.ref_name }}"
           sed -i "s|const FALLBACK_VERSION = 'v[0-9.]*';|const FALLBACK_VERSION = '${TAG}';|g" docs/download/index.html
           sed -i "s|id=\"hero-version\">v[0-9.]*<|id=\"hero-version\">${TAG}<|g" docs/download/index.html
-          echo "Updated download page fallback to ${TAG}"
 
       - name: Commit download page update
         uses: stefanzweifel/git-auto-commit-action@v5
