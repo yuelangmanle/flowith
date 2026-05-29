@@ -614,6 +614,15 @@ function ChangelogSection() {
   const [expanded, setExpanded] = useState(false);
   const versions = [
     {
+      version: "v1.1.1",
+      date: "2026-05-29",
+      changes: [
+        "🔧 修复 macOS x86_64 CI 构建失败问题",
+        "🐛 修复 Skills 上下文缓存重复清理",
+        "🏗️ TypeScript 编译警告修复",
+      ],
+    },
+    {
       version: "v1.1.0",
       date: "2026-05-29",
       changes: [
@@ -645,7 +654,7 @@ function ChangelogSection() {
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 16 }}>📋</span>
           <span style={{ fontSize: 14, fontWeight: 600 }}>更新日志</span>
-          <span style={{ fontSize: 11, color: "var(--text-muted)", background: "var(--bg)", padding: "2px 8px", borderRadius: 4 }}>v1.1.0</span>
+          <span style={{ fontSize: 11, color: "var(--text-muted)", background: "var(--bg)", padding: "2px 8px", borderRadius: 4 }}>v1.1.1</span>
         </div>
         <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{expanded ? "收起" : "展开"}</span>
       </div>

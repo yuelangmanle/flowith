@@ -151,7 +151,6 @@ export function buildContextMessages(
       fullSystemPrompt += context;
       skillsUsed = count;
       evictSkillsCacheIfNeeded();
-      evictSkillsCacheIfNeeded();
       skillsCache.set(skillsHash, { hash: skillsHash, context, skillCount: count });
     }
   }
@@ -255,7 +254,6 @@ export async function buildContextMessagesAsync(
       const { context, count } = buildSkillsContext(installedSkills, userQuery, specifiedSkill);
       fullSystemPrompt += context;
       skillsUsed = count;
-      evictSkillsCacheIfNeeded();
       evictSkillsCacheIfNeeded();
       skillsCache.set(skillsHash, { hash: skillsHash, context, skillCount: count });
     }

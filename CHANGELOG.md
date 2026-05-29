@@ -1,5 +1,20 @@
 # Flowith 更新日志
 
+## v1.1.1 (2026-05-29)
+
+### 🔧 构建修复
+- **修复 macOS x86_64 CI 构建失败**: `build-sidecar.mjs` 现在支持 `--target` 参数，用于 CI 交叉编译场景
+- **修复 TypeScript 编译警告**: `tsconfig.node.json` 显式设置 `noEmit: false`
+
+### 🐛 Bug 修复
+- **修复 Skills 上下文缓存重复清理**: 移除 `contextManager.ts` 中重复的 `evictSkillsCacheIfNeeded()` 调用
+
+### 🏗️ CI/CD
+- Release workflow 传递 `--target` 给 build-sidecar 脚本
+- 确保 macOS aarch64、macOS x86_64、Windows x86_64 三平台正确构建
+
+---
+
 ## v1.1.0 (2026-05-29)
 
 ### 🧠 记忆系统完整增强
@@ -65,16 +80,3 @@
 - OpenAI TTS
 - Edge TTS（免费）
 - Fish Audio
-
----
-
-## v0.3.0 (2026-05-28)
-
-### 多 Agent 协作平台重构
-- Agent 编排引擎（顺序/层级/圆桌）
-- 圆桌 UI（QQ 群聊式）
-- 投票系统
-- 代码生成流水线
-- 记忆系统 L1-L4
-- Skills 技能市场
-- Tauri 桌面打包
