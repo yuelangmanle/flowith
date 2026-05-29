@@ -317,12 +317,28 @@ export interface MemoryItem {
   confidence: number;
   source: SourceRef;
   createdAt: string;
+  updatedAt?: string;
   lastUsedAt?: string;
   confirmed: boolean;
   scope: "project" | "global";
   retention: "keep" | "expire" | "delete";
   importance: number; // 0-1, 用于衰减
   tags: string[];
+  version: number;
+  relatedIds?: string[];
+  sourceConversationId?: string;
+  sourceMessageId?: string;
+  hitCount?: number;
+}
+
+export interface MemoryStats {
+  totalItems: number;
+  l1Count: number;
+  l2Count: number;
+  l3Count: number;
+  l4Count: number;
+  recentAdditions: number; // last 7 days
+  totalHits: number;
 }
 
 // ─── Knowledge ──────────────────────────────────────────────────

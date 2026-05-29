@@ -3,6 +3,8 @@
 // Integrates compression (L1-L3 sync, L4 async) and budget control.
 
 import type { ChatMessage, ProviderConfig, CompressionStats } from "./types";
+import type { MemoryStore } from "./memoryKnowledge";
+import { queryMemory } from "./memoryKnowledge";
 import { getModelContextWindow } from "./types";
 import { estimateTokens, estimateMessagesTokens, hashString } from "./tokenCounter";
 import { compressContextSync, compressContext, type CompressionOptions } from "./contextCompressor";
@@ -19,6 +21,7 @@ export interface ContextBuildOptions {
   installedSkills?: Array<{ nameZh: string; descriptionZh: string; capabilities?: string[] }>;
   specifiedSkill?: string;
   userQuery?: string;             // for skills relevance matching
+  memoryStore?: MemoryStore;      // for memory injection
 }
 
 export interface ContextBuildResult {
@@ -122,6 +125,7 @@ export function buildContextMessages(
     installedSkills,
     specifiedSkill,
     userQuery,
+    memoryStore,
   } = options;
 
   const contextWindow = getModelContextWindow(model);
@@ -152,9 +156,22 @@ export function buildContextMessages(
     }
   }
 
+  // 3. Inject relevant memories
+  if (memoryStore && userQuery) {
+    const relevantMemories = queryMemory(memoryStore, userQuery, 5);
+    if (relevantMemories.length > 0) {
+      const memoryLines = relevantMemories.map((m) => {
+        const layerLabel = m.layer === "L3-fact" ? "事实" : m.layer === "L4-episodic" ? "情景" : m.layer === "L1-conversation" ? "对话" : "工作";
+        const importance = Math.round(m.importance * 100);
+        return `- [${layerLabel}] ${m.content} (重要度: ${importance}%)`;
+      });
+      fullSystemPrompt += `\n\n【相关记忆】根据你的记忆，以下信息可能与当前任务相关:\n${memoryLines.join("\n")}`;
+    }
+  }
+
   const systemTokens = estimateTokens(fullSystemPrompt);
 
-  // 2. Compress history (L1-L3 sync, no L4 for speed)
+  // 4. Compress history (L1-L3 sync, no L4 for speed)
   const { compressed, stats } = compressContextSync(messages, {
     ...compressionOptions,
     currentTurnIndex: compressionOptions.currentTurnIndex ?? messages.length - 1,
@@ -214,6 +231,7 @@ export async function buildContextMessagesAsync(
     installedSkills,
     specifiedSkill,
     userQuery,
+    memoryStore,
   } = options;
 
   const contextWindow = getModelContextWindow(model);
@@ -240,6 +258,19 @@ export async function buildContextMessagesAsync(
       evictSkillsCacheIfNeeded();
       evictSkillsCacheIfNeeded();
       skillsCache.set(skillsHash, { hash: skillsHash, context, skillCount: count });
+    }
+  }
+
+  // Inject relevant memories (async version)
+  if (memoryStore && userQuery) {
+    const relevantMemories = queryMemory(memoryStore, userQuery, 5);
+    if (relevantMemories.length > 0) {
+      const memoryLines = relevantMemories.map((m) => {
+        const layerLabel = m.layer === "L3-fact" ? "事实" : m.layer === "L4-episodic" ? "情景" : m.layer === "L1-conversation" ? "对话" : "工作";
+        const importance = Math.round(m.importance * 100);
+        return `- [${layerLabel}] ${m.content} (重要度: ${importance}%)`;
+      });
+      fullSystemPrompt += `\n\n【相关记忆】根据你的记忆，以下信息可能与当前任务相关:\n${memoryLines.join("\n")}`;
     }
   }
 

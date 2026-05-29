@@ -245,12 +245,13 @@ export async function* streamAgentMessage(
   provider: ProviderConfig,
   modelId: string,
   installedSkills?: Array<{ nameZh: string; descriptionZh: string; capabilities?: string[] }>,
-  specifiedSkill?: string
+  specifiedSkill?: string,
+  memoryStore?: import("./memoryKnowledge").MemoryStore
 ): AsyncGenerator<StreamChunk> {
   const agent = getAgentById(agentId);
   const systemPrompt = agent?.systemPrompt ?? "你是一个有用的 AI 助手。请用中文回答用户的问题，保持简洁专业。";
 
-  // Use context manager for token-aware context building with compression
+  // Use context manager for token-aware context building with compression + memory injection
   const contextResult = buildContextMessages({
     messages: conversation.messages,
     systemPrompt,
@@ -258,6 +259,7 @@ export async function* streamAgentMessage(
     installedSkills,
     specifiedSkill,
     userQuery: userMessage,
+    memoryStore,
   });
 
   yield {

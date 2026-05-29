@@ -21,7 +21,8 @@ import {
 } from "../core/roundtable";
 import { runSequential, runHierarchical, streamAgentMessage } from "../core/agentOrchestrator";
 import { createCodeGenRun, runFullPipeline, getProgressPercentage } from "../core/codeGeneration";
-import { createMemoryStore, addToL1, addToL2, addFact, queryMemory, writeMemory } from "../core/memoryKnowledge";
+import { createMemoryStore, addToL1, addToL2, addFact, queryMemory, writeMemory, getMemoryStats, evictExpiredMemories, findSimilarMemories } from "../core/memoryKnowledge";
+import { captureConversationMemory, consolidateMemories } from "../core/memoryConsolidator";
 import { extractFileContent } from "./fileExtractor";
 import type {
   Conversation,
@@ -31,6 +32,7 @@ import type {
   VoteSession,
   CodeGenRun,
   AgentConfig,
+  MemoryItem,
 } from "../core/types";
 import type { RoundtableState } from "../core/roundtable";
 import type { MemoryStore } from "../core/memoryKnowledge";
@@ -415,7 +417,7 @@ export async function createServer() {
         try {
           let fullContent = "";
           const skillsForAgent = installedSkills.filter((s) => s.installed).map((s) => ({ nameZh: s.nameZh || s.name, descriptionZh: s.descriptionZh || s.description, capabilities: s.capabilities }));
-          for await (const chunk of streamAgentMessage(conv, body.message, agentId, provider, model, skillsForAgent, body.specifiedSkill)) {
+          for await (const chunk of streamAgentMessage(conv, body.message, agentId, provider, model, skillsForAgent, body.specifiedSkill, memory)) {
             if (chunk.type === "text" && chunk.content) {
               fullContent += chunk.content;
               sendSSE(response, "text", chunk);
@@ -432,6 +434,12 @@ export async function createServer() {
               conv.messages.push(assistantMsg);
               conv.updatedAt = new Date().toISOString();
               await saveConversationsToDisk();
+
+              // Auto-capture memory from conversation
+              try {
+                const captured = captureConversationMemory(memory, body.message, fullContent, body.conversationId, assistantMsg.id);
+                if (captured) await saveMemoryToDisk();
+              } catch {}
               sendSSE(response, "done", { messageId: assistantMsg.id });
             } else if (chunk.type === "error") {
               sendSSE(response, "error", chunk);
@@ -481,7 +489,7 @@ export async function createServer() {
 
         try {
           sendSSE(response, "start", { topic: body.topic, agents: agentList.map((a) => ({ id: a.id, name: a.name, avatar: a.avatar })) });
-          for await (const chunk of runRoundtableDiscussion(state, provider, model)) {
+          for await (const chunk of runRoundtableDiscussion(state, provider, model, memory)) {
             if (chunk.type === "text") sendSSE(response, "text", chunk);
             else if (chunk.type === "error") sendSSE(response, "error", chunk);
             else if (chunk.type === "done") {
@@ -711,6 +719,32 @@ export async function createServer() {
         if (!layer || layer === "all") { memory.items = []; memory.l1Buffer = []; memory.l2Buffer = []; }
         await saveMemoryToDisk();
         return send(response, 200, { ok: true });
+      }
+      if (request.method === "POST" && path === "/api/memory/consolidate") {
+        const result = consolidateMemories(memory);
+        await saveMemoryToDisk();
+        return send(response, 200, result);
+      }
+      if (request.method === "GET" && path === "/api/memory/stats") {
+        return send(response, 200, getMemoryStats(memory));
+      }
+      if (request.method === "POST" && path === "/api/memory/export") {
+        return send(response, 200, { items: memory.items, l1: memory.l1Buffer, l2: memory.l2Buffer, exportedAt: new Date().toISOString() });
+      }
+      if (request.method === "POST" && path === "/api/memory/import") {
+        const body = await readJson(request) as { items?: MemoryItem[]; l1?: MemoryItem[]; l2?: MemoryItem[] };
+        if (body.items) memory.items.push(...body.items);
+        if (body.l1) memory.l1Buffer.push(...body.l1);
+        if (body.l2) memory.l2Buffer.push(...body.l2);
+        await saveMemoryToDisk();
+        return send(response, 200, { ok: true, imported: (body.items?.length ?? 0) + (body.l1?.length ?? 0) + (body.l2?.length ?? 0) });
+      }
+      if (request.method === "GET" && path.startsWith("/api/memory/relations/")) {
+        const itemId = path.split("/").pop();
+        const item = [...memory.items, ...memory.l1Buffer, ...memory.l2Buffer].find(m => m.id === itemId);
+        if (!item) return send(response, 404, { error: "Memory not found" });
+        const related = (item.relatedIds ?? []).map(id => [...memory.items, ...memory.l1Buffer, ...memory.l2Buffer].find(m => m.id === id)).filter(Boolean);
+        return send(response, 200, { item, related });
       }
 
       // ─── Fallback Models ─────────────────────────────
@@ -984,6 +1018,15 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   server.on("error", (err) => {
     console.error("[SERVER] Error:", err.message);
   });
+  // Auto-consolidation timer: every 10 minutes
+  setInterval(async () => {
+    try {
+      consolidateMemories(memory);
+      evictExpiredMemories(memory);
+      await saveMemoryToDisk();
+    } catch {}
+  }, 10 * 60 * 1000);
+
   server.listen(port, "127.0.0.1", () => {
     console.log(`Agent API v0.3.0 listening on http://127.0.0.1:${port}`);
   });

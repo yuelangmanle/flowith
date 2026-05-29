@@ -14,6 +14,8 @@ import { getAgentById } from "./agentConfig";
 import { streamChatCompletion } from "./modelGateway";
 import { buildContextMessages } from "./contextManager";
 import { estimateTokens } from "./tokenCounter";
+import type { MemoryStore } from "./memoryKnowledge";
+import { queryMemory, addEpisode } from "./memoryKnowledge";
 
 // ─── Roundtable State ───────────────────────────────────────────
 
@@ -86,15 +88,28 @@ function buildDiscussionPrompt(
 export async function* runRoundtableDiscussion(
   state: RoundtableState,
   provider: ProviderConfig,
-  model: string
+  model: string,
+  memoryStore?: MemoryStore
 ): AsyncGenerator<StreamChunk> {
   state.status = "discussing";
 
   for (let round = 0; round < state.maxRounds; round++) {
     state.currentRound = round;
 
+    // Query relevant memories for the discussion topic
+    let memoryContext = "";
+    if (memoryStore && round === 0) {
+      const relevantMemories = queryMemory(memoryStore, state.topic, 5);
+      if (relevantMemories.length > 0) {
+        memoryContext = "\n\n【相关记忆】讨论前请参考以下记忆：" + relevantMemories.map(m => {
+          const layer = m.layer === "L3-fact" ? "事实" : "情景";
+          return `\n- [${layer}] ${m.content}`;
+        }).join("");
+      }
+    }
+
     for (const agent of state.agents) {
-      const prompt = buildDiscussionPrompt(state, agent, round, model);
+      const prompt = buildDiscussionPrompt(state, agent, round, model) + memoryContext;
       const messages: Array<{ role: string; content: string }> = [];
 
       if (agent.systemPrompt) {
@@ -155,6 +170,14 @@ export async function* runRoundtableDiscussion(
 
   state.status = "completed";
   state.conversation.updatedAt = new Date().toISOString();
+
+  // Capture discussion conclusion as L4 episodic memory
+  if (memoryStore) {
+    const lastMsgs = state.conversation.messages.slice(-3);
+    const conclusion = lastMsgs.map(m => `[${m.agentName ?? "用户"}]: ${m.content.slice(0, 200)}`).join("\n");
+    addEpisode(memoryStore, `圆桌讨论 [${state.topic}]: ${conclusion}`, {}, ["roundtable", "discussion"], { importance: 0.7 });
+  }
+
   yield { type: "done" };
 }
 
