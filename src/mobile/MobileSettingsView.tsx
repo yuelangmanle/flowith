@@ -588,7 +588,7 @@ export function MobileSettingsView() {
 
         {/* ─── Auto-update ─── */}
         <div style={{ marginBottom: 20, display: "flex", alignItems: "center", gap: 8 }}>
-          <UpdateChecker currentVersion="1.3.3" platform="android" mode="compact" />
+          <UpdateChecker currentVersion="1.3.4" platform="android" mode="compact" />
         </div>
 
         {/* ─── Token Stats ─── */}
@@ -650,7 +650,7 @@ export function MobileSettingsView() {
           }}>
             <span style={{ fontSize: 16 }}>📋</span>
             <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>更新日志</span>
-            <span style={{ fontSize: 11, color: "var(--text-muted)", background: "var(--bg-secondary)", padding: "2px 8px", borderRadius: 4, marginLeft: "auto" }}>v1.3.3</span>
+            <span style={{ fontSize: 11, color: "var(--text-muted)", background: "var(--bg-secondary)", padding: "2px 8px", borderRadius: 4, marginLeft: "auto" }}>v1.3.4</span>
             {showChangelog ? <ChevronDown size={16} style={{ color: "var(--text-muted)" }} /> : <ChevronRight size={16} style={{ color: "var(--text-muted)" }} />}
           </button>
           {showChangelog && (
@@ -693,6 +693,16 @@ function StatCard({ label, value, color }: { label: string; value: string; color
 // ─── Data ───────────────────────────────────────────────────────
 
 const changelog = [
+  {
+    version: "v1.3.4",
+    date: "2026-05-29",
+    changes: [
+      "🔧 自定义模型 ID 输入",
+      "🚫 废弃模型过滤",
+      "📱 移动端对话/圆桌修复",
+      "🧹 代码清理",
+    ],
+  },
   {
     version: "v1.3.3",
     date: "2026-05-29",

@@ -7,7 +7,7 @@ import { saveProviders } from "../core/persistence";
 import type { ModelConfig, ProviderConfig, TTSProviderConfig } from "../core/types";
 
 // App version
-const APP_VERSION = "1.3.3";
+const APP_VERSION = "1.3.4";
 function detectPlatform(): "mac" | "win" | "android" {
   if ((window as any).Capacitor) return "android";
   const ua = navigator.userAgent.toLowerCase();
@@ -671,6 +671,17 @@ function ChangelogSection() {
   const [expanded, setExpanded] = useState(false);
   const versions = [
     {
+      version: "v1.3.4",
+      date: "2026-05-29",
+      changes: [
+        "🔧 自定义模型 ID 输入（桌面端+移动端）",
+        "🚫 DeepSeek 废弃模型过滤（精确 ID 黑名单）",
+        "📱 移动端对话 resp.ok 检查 + 模型可用性验证",
+        "📱 移动端圆桌会议修复（done 事件 + 错误处理）",
+        "🧹 清理 ChatView 死代码（expandedThinking）",
+      ],
+    },
+    {
       version: "v1.3.3",
       date: "2026-05-29",
       changes: [
@@ -758,7 +769,7 @@ function ChangelogSection() {
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 16 }}>📋</span>
           <span style={{ fontSize: 14, fontWeight: 600 }}>更新日志</span>
-          <span style={{ fontSize: 11, color: "var(--text-muted)", background: "var(--bg)", padding: "2px 8px", borderRadius: 4 }}>v1.3.3</span>
+          <span style={{ fontSize: 11, color: "var(--text-muted)", background: "var(--bg)", padding: "2px 8px", borderRadius: 4 }}>v1.3.4</span>
         </div>
         <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{expanded ? "收起" : "展开"}</span>
       </div>
