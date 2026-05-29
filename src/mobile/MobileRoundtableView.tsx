@@ -96,8 +96,7 @@ export function MobileRoundtableView() {
               } else if (eventType === "done") {
                 setRunning(false);
                 if (data.conversationId) {
-                  const conv = createConversation("roundtable", `圆桌: ${topic.slice(0, 20)}`);
-                  setActiveConvId(conv.id);
+                  setActiveConvId(data.conversationId);
                 }
               } else if (eventType === "error") {
                 showToast(`错误: ${data.error}`, "error");

@@ -629,6 +629,18 @@ function ChangelogSection() {
   const [expanded, setExpanded] = useState(false);
   const versions = [
     {
+      version: "v1.3.3",
+      date: "2026-05-29",
+      changes: [
+        "🧠 MiMo reasoning_content 多轮对话回传修复",
+        "💬 思考过程合并碎片化 + ThinkingBlock 统一",
+        "📱 移动端 Skills 内置 25+ 技能市场",
+        "🔧 Provider 测试 fallback 默认模型 + 中文错误",
+        "🔄 检查更新动态版本号 + 平台检测",
+        "📦 全平台构建：macOS/Windows/Android",
+      ],
+    },
+    {
       version: "v1.3.2",
       date: "2026-05-29",
       changes: [
@@ -704,7 +716,7 @@ function ChangelogSection() {
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 16 }}>📋</span>
           <span style={{ fontSize: 14, fontWeight: 600 }}>更新日志</span>
-          <span style={{ fontSize: 11, color: "var(--text-muted)", background: "var(--bg)", padding: "2px 8px", borderRadius: 4 }}>v1.3.2</span>
+          <span style={{ fontSize: 11, color: "var(--text-muted)", background: "var(--bg)", padding: "2px 8px", borderRadius: 4 }}>v1.3.3</span>
         </div>
         <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{expanded ? "收起" : "展开"}</span>
       </div>

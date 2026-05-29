@@ -565,7 +565,7 @@ export function MobileSettingsView() {
 
         {/* ─── Auto-update ─── */}
         <div style={{ marginBottom: 20, display: "flex", alignItems: "center", gap: 8 }}>
-          <UpdateChecker currentVersion="1.3.2" platform="android" mode="compact" />
+          <UpdateChecker currentVersion="1.3.3" platform="android" mode="compact" />
         </div>
 
         {/* ─── Token Stats ─── */}
@@ -621,7 +621,7 @@ export function MobileSettingsView() {
           }}>
             <span style={{ fontSize: 16 }}>📋</span>
             <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>更新日志</span>
-            <span style={{ fontSize: 11, color: "var(--text-muted)", background: "var(--bg-secondary)", padding: "2px 8px", borderRadius: 4, marginLeft: "auto" }}>v1.3.1</span>
+            <span style={{ fontSize: 11, color: "var(--text-muted)", background: "var(--bg-secondary)", padding: "2px 8px", borderRadius: 4, marginLeft: "auto" }}>v1.3.3</span>
             {showChangelog ? <ChevronDown size={16} style={{ color: "var(--text-muted)" }} /> : <ChevronRight size={16} style={{ color: "var(--text-muted)" }} />}
           </button>
           {showChangelog && (
@@ -664,6 +664,18 @@ function StatCard({ label, value, color }: { label: string; value: string; color
 // ─── Data ───────────────────────────────────────────────────────
 
 const changelog = [
+  {
+    version: "v1.3.3",
+    date: "2026-05-29",
+    changes: [
+      "🧠 MiMo reasoning_content 多轮对话回传修复",
+      "💬 思考过程合并碎片化 + ThinkingBlock 统一",
+      "📱 移动端 Skills 内置 25+ 技能市场",
+      "🔧 Provider 测试 fallback 默认模型 + 中文错误",
+      "🔄 检查更新动态版本号 + 平台检测",
+      "📦 全平台构建：macOS/Windows/Android",
+    ],
+  },
   {
     version: "v1.3.2",
     date: "2026-05-29",

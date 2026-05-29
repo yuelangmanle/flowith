@@ -41,7 +41,6 @@ export function ChatView() {
   const [attachedFiles, setAttachedFiles] = useState<Array<{ name: string; type: string; size: number; content?: string; base64?: string }>>([]);
   const abortRef = useRef<AbortController | null>(null);
   const [expandedMsgs, setExpandedMsgs] = useState<Set<string>>(new Set());
-  const [expandedThinking, setExpandedThinking] = useState<Set<string>>(new Set());
   const [specifiedSkill, setSpecifiedSkill] = useState<string>("");
   const [showSkillPicker, setShowSkillPicker] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -198,7 +197,6 @@ export function ChatView() {
     const mainContent = textParts.join("").trim();
     const isLong = mainContent.length > COLLAPSE_THRESHOLD;
     const isExpanded = expandedMsgs.has(msgId);
-    const isThinkingExpanded = expandedThinking.has(msgId);
 
     // Parse code blocks: ```lang\ncode\n```
     const parts = mainContent.split(/(```[\s\S]*?```)/g);
@@ -237,7 +235,7 @@ export function ChatView() {
     });
 
     const thinkingPanel = thinkingText ? (
-      <ThinkingBlock content={thinkingText} defaultExpanded={expandedThinking.has(msgId)} />
+      <ThinkingBlock content={thinkingText} />
     ) : null;
 
     if (isLong && !isExpanded) {
