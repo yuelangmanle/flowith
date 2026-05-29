@@ -426,8 +426,13 @@ export async function createServer() {
             } else if (chunk.type === "done") {
               clearTimeout(timeout);
               const agent = getAgentById(agentId);
+              // Extract reasoning content from <think> tags for separate storage
+              const thinkMatches = fullContent.match(/<think>([\s\S]*?)<\/think>/g);
+              const reasoningContent = thinkMatches ? thinkMatches.map(m => m.replace(/<think>|<\/think>/g, "")).join("") : "";
+              const cleanContent = fullContent.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
               const assistantMsg: ChatMessage = {
-                id: uid(), role: "assistant", content: fullContent,
+                id: uid(), role: "assistant", content: cleanContent,
+                reasoningContent: reasoningContent || undefined,
                 agentId: agent?.id, agentName: agent?.name, agentColor: agent?.color,
                 createdAt: new Date().toISOString(),
               };

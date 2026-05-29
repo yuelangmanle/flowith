@@ -602,7 +602,10 @@ export function ChatView() {
                     ))}
                   </div>
                 )}
-                {renderMessageContent(msg.content.replace(/\[图片已附加\]\s*/g, "").replace(/\[文件:[^\]]+\]\s*/g, "").trim(), msg.id)}
+                {(() => {
+                  const displayContent = (msg.reasoningContent ? `<think>${msg.reasoningContent}</think>` : "") + msg.content.replace(/\[图片已附加\]\s*/g, "").replace(/\[文件:[^\]]+\]\s*/g, "").trim();
+                  return renderMessageContent(displayContent, msg.id);
+                })()}
                 {msg.role === "assistant" && renderCitations(msg.content.replace(/<think>[\s\S]*?<\/think>/g, "").replace(/\[思考\][\s\S]*?\[\/思考\]/g, ""))}
                 {msg.role === "assistant" && (
                   <div style={{ display: "flex", gap: 4, marginTop: 4, alignItems: "center" }}>
@@ -656,17 +659,27 @@ export function ChatView() {
               <div className="msg-bubble">
                 {streamingAgent && <div className="msg-agent-name" style={{ color: streamingAgent.color }}>{streamingAgent.avatar} {streamingAgent.name}<span className="streaming-dot" /></div>}
                 {(() => {
-                  // Extract thinking from streaming content
-                  const thinkMatch = streamingContent.match(/^(<think>[\s\S]*?<\/think>)([\s\S]*)$/s);
-                  if (thinkMatch) {
-                    const thinkText = thinkMatch[1].replace(/<think>|<\/think>/g, "").trim();
-                    const mainText = thinkMatch[2].trim();
+                  // Merge all <think> blocks (streaming may send multiple small blocks)
+                  let processed = streamingContent;
+                  let prev2 = "";
+                  while (prev2 !== processed) { prev2 = processed; processed = processed.replace(/<\/think>[\s\n]*<think>>/g, "\n"); }
+                  // Also handle incomplete last block (still streaming)
+                  const allThinkMatches = processed.match(/<think>([\s\S]*?)(<\/think>|$)/g);
+                  if (allThinkMatches && allThinkMatches.length > 0) {
+                    const thinkText = allThinkMatches.map(m => m.replace(/<think>|<\/think>/g, "")).join("").trim();
+                    const mainText = processed.replace(/<think>[\s\S]*?(<\/think>|$)/g, "").trim();
+                    // Clean up fragmented thinking
+                    const lines = thinkText.split("\n").filter(l => l.trim().length > 0);
+                    const avgLen = lines.length > 0 ? lines.reduce((s, l) => s + l.trim().length, 0) / lines.length : 0;
+                    const displayThink = (lines.length > 3 && avgLen < 30)
+                      ? lines.map(l => l.trim()).join("")
+                      : thinkText;
                     return (
                       <>
                         <div style={{ marginBottom: 6, padding: "6px 10px", borderRadius: 6, background: "var(--bg)", border: "1px solid var(--border)", fontSize: 11, color: "var(--text-secondary)" }}>
-                          <span style={{ marginRight: 4 }}><BrainIcon size={14} /></span>深度思考中... ({thinkText.length} 字)
+                          <span style={{ marginRight: 4 }}><BrainIcon size={14} /></span>深度思考中... ({displayThink.length} 字)
                         </div>
-                        <div style={{ whiteSpace: "pre-wrap" }}>{mainText}<span className="streaming-dot" /></div>
+                        {mainText && <div style={{ whiteSpace: "pre-wrap" }}>{mainText}<span className="streaming-dot" /></div>}
                       </>
                     );
                   }

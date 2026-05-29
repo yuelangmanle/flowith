@@ -316,6 +316,7 @@ export async function* handleChatStream(
 
   try {
     let fullContent = "";
+    let reasoningContent = "";
     const skillsForAgent = state.installedSkills.filter((s) => s.installed).map((s) => ({ nameZh: s.nameZh || s.name, descriptionZh: s.descriptionZh || s.description, capabilities: s.capabilities }));
     for await (const chunk of streamAgentMessage(conv, body.message, agentId, provider, model, skillsForAgent, body.specifiedSkill, state.memory)) {
       if (chunk.type === "text" && chunk.content) {
@@ -325,8 +326,16 @@ export async function* handleChatStream(
         yield { type: "usage", data: { usage: chunk.usage } };
       } else if (chunk.type === "done") {
         const agent = getAgentById(agentId);
+        // Extract reasoning content from <think> tags for separate storage
+        const thinkMatches = fullContent.match(/<think>([\s\S]*?)<\/think>/g);
+        if (thinkMatches) {
+          reasoningContent = thinkMatches.map(m => m.replace(/<think>|<\/think>/g, "")).join("");
+        }
+        // Strip <think> tags from the display content
+        const cleanContent = fullContent.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
         const assistantMsg: ChatMessage = {
-          id: uid(), role: "assistant", content: fullContent,
+          id: uid(), role: "assistant", content: cleanContent,
+          reasoningContent: reasoningContent || undefined,
           agentId: agent?.id, agentName: agent?.name, agentColor: agent?.color,
           createdAt: new Date().toISOString(),
         };

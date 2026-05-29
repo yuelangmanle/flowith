@@ -391,10 +391,15 @@ export function MobileChatView() {
                   });
                 }
               } else if (eventType === "done") {
+                // Extract reasoning from <think> tags for separate storage
+                const thinkMatches = full.match(/<think>([\s\S]*?)<\/think>/g);
+                const reasoning = thinkMatches ? thinkMatches.map(m => m.replace(/<think>|<\/think>/g, "")).join("") : "";
+                const cleanContent = full.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
                 const assistantMsg: ChatMessage = {
                   id: data.messageId ?? uid(),
                   role: "assistant",
-                  content: full,
+                  content: cleanContent,
+                  reasoningContent: reasoning || undefined,
                   createdAt: new Date().toISOString(),
                   agentId: data.agentId,
                   tokenUsage: data.tokenUsage,
@@ -699,7 +704,7 @@ export function MobileChatView() {
                   </div>
                 ) : (
                   <MessageRenderer
-                    content={msg.content}
+                    content={(msg.reasoningContent ? `<think>${msg.reasoningContent}</think>` : "") + msg.content}
                     msgId={msg.id}
                     imageData={msg.imageData}
                     additionalImages={msg.additionalImages}

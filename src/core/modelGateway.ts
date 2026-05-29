@@ -155,7 +155,7 @@ export function mergeDiscoveredModels(
 export interface ChatCompletionRequest {
   provider: ProviderConfig;
   model: string;
-  messages: Array<{ role: string; content: string; imageData?: string; additionalImages?: string[] }>;
+  messages: Array<{ role: string; content: string; reasoningContent?: string; imageData?: string; additionalImages?: string[] }>;
   temperature?: number;
   maxTokens?: number;
   stream?: boolean;
@@ -164,7 +164,7 @@ export interface ChatCompletionRequest {
   tokenBudget?: TokenBudget;
 }
 
-function buildChatMessages(msgs: ChatCompletionRequest["messages"]): Array<{ role: string; content: string | Array<Record<string, unknown>> }> {
+function buildChatMessages(msgs: ChatCompletionRequest["messages"]): Array<{ role: string; content: string | Array<Record<string, unknown>>; reasoning_content?: string }> {
   return msgs.map((m) => {
     // Build multimodal content if images present
     if (m.imageData) {
@@ -175,9 +175,13 @@ function buildChatMessages(msgs: ChatCompletionRequest["messages"]): Array<{ rol
           parts.push({ type: "image_url", image_url: { url: img } });
         }
       }
-      return { role: m.role, content: parts };
+      const result: { role: string; content: string | Array<Record<string, unknown>>; reasoning_content?: string } = { role: m.role, content: parts };
+      if (m.reasoningContent) result.reasoning_content = m.reasoningContent;
+      return result;
     }
-    return { role: m.role, content: m.content };
+    const result: { role: string; content: string | Array<Record<string, unknown>>; reasoning_content?: string } = { role: m.role, content: m.content };
+    if (m.reasoningContent) result.reasoning_content = m.reasoningContent;
+    return result;
   });
 }
 

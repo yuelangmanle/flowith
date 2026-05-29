@@ -196,10 +196,13 @@ export function buildContextMessages(
       break;
     }
 
-    resultMessages.splice(1, 0, {
+    const resultMsg: Record<string, unknown> = {
       role: msg.role === "assistant" ? "assistant" : "user",
       content,
-    });
+    };
+    // Pass reasoningContent back for MiMo/DeepSeek multi-turn compatibility
+    if (msg.reasoningContent) resultMsg.reasoningContent = msg.reasoningContent;
+    resultMessages.splice(1, 0, resultMsg as { role: string; content: string; reasoningContent?: string });
     usedTokens += msgTokens;
   }
 
@@ -297,10 +300,13 @@ export async function buildContextMessagesAsync(
 
     if (usedTokens + msgTokens > inputBudget) break;
 
-    resultMessages.splice(1, 0, {
+    const resultMsg: Record<string, unknown> = {
       role: msg.role === "assistant" ? "assistant" : "user",
       content,
-    });
+    };
+    // Pass reasoningContent back for MiMo/DeepSeek multi-turn compatibility
+    if (msg.reasoningContent) resultMsg.reasoningContent = msg.reasoningContent;
+    resultMessages.splice(1, 0, resultMsg as { role: string; content: string; reasoningContent?: string });
     usedTokens += msgTokens;
   }
 
