@@ -327,8 +327,10 @@ export async function* streamChatCompletion(
             }
             yield { type: "text", content: delta.content };
           }
-          // DeepSeek reasoning_content in streaming
-          const rContent = (delta as Record<string, unknown>)?.reasoning_content as string | undefined;
+          // Handle reasoning content from multiple providers
+          // DeepSeek uses 'reasoning_content', some others use 'reasoning'
+          const rContent = (delta as Record<string, unknown>)?.reasoning_content as string | undefined
+            ?? (delta as Record<string, unknown>)?.reasoning as string | undefined;
           if (rContent) {
             reasoningBuffer += rContent;
           }
