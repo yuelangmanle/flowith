@@ -85,6 +85,7 @@ export interface ModelConfig {
   capabilities: ModelCapabilities;
   stale?: boolean;
   lastError?: string;
+  source?: "custom" | "discovered";
 }
 
 // ─── Agent ──────────────────────────────────────────────────────

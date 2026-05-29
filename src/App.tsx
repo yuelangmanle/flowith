@@ -131,7 +131,11 @@ export function App() {
           const resp = await apiFetch("/api/providers/discover", { method: "POST", body: JSON.stringify({ providerId: p.id }) });
           if (resp.ok) {
             const data = await resp.json() as { models: ModelConfig[]; count: number };
-            setModels((prev) => [...prev.filter((m) => m.providerId !== p.id), ...data.models]);
+            setModels((prev) => {
+              const custom = prev.filter((m) => m.providerId === p.id && m.source === "custom");
+              const discovered = data.models.filter((dm) => !custom.some((cm) => cm.id === dm.id));
+              return [...prev.filter((m) => m.providerId !== p.id), ...custom, ...discovered];
+            });
           }
         } catch {}
       }

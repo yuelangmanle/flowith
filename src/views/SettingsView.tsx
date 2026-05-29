@@ -368,7 +368,7 @@ export function SettingsView() {
                         const id = customModelId.trim();
                         const existing = models.find((m) => m.providerId === p.id && m.id === id);
                         if (existing) { showToast("模型已存在", "error"); return; }
-                        const newModel: ModelConfig = { id, providerId: p.id, name: id, capabilities: {} };
+                        const newModel: ModelConfig = { id, providerId: p.id, name: id, capabilities: {}, source: "custom" };
                         setModels((prev) => [...prev, newModel]);
                         setCustomModelId("");
                         showToast(`已添加 ${id}`, "success");
@@ -381,7 +381,7 @@ export function SettingsView() {
                     const id = customModelId.trim();
                     const existing = models.find((m) => m.providerId === p.id && m.id === id);
                     if (existing) { showToast("模型已存在", "error"); return; }
-                    const newModel: ModelConfig = { id, providerId: p.id, name: id, capabilities: {} };
+                    const newModel: ModelConfig = { id, providerId: p.id, name: id, capabilities: {}, source: "custom" };
                     setModels((prev) => [...prev, newModel]);
                     setCustomModelId("");
                     showToast(`已添加 ${id}`, "success");

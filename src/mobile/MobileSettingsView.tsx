@@ -620,7 +620,7 @@ export function MobileSettingsView() {
               onAddModel={(id) => {
                 const existing = models.find((m) => m.providerId === p.id && m.id === id);
                 if (existing) { showToast("模型已存在", "error"); return; }
-                setModels((prev) => [...prev, { id, providerId: p.id, name: id, capabilities: {} }]);
+                setModels((prev) => [...prev, { id, providerId: p.id, name: id, capabilities: {}, source: "custom" }]);
                 showToast(`已添加 ${id}`, "success");
               }}
             />

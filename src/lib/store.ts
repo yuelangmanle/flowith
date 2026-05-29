@@ -121,8 +121,21 @@ export const useStore = create<AppState>((set, get) => ({
   // Providers & Models
   providers: createDefaultProviders(),
   setProviders: (p) => set({ providers: typeof p === "function" ? p(get().providers) : p }),
-  models: [],
-  setModels: (m) => set({ models: typeof m === "function" ? m(get().models) : m }),
+  models: (() => {
+    try {
+      const saved = localStorage.getItem("flowith-custom-models");
+      return saved ? JSON.parse(saved) as ModelConfig[] : [];
+    } catch { return []; }
+  })(),
+  setModels: (m) => {
+    const next = typeof m === "function" ? m(get().models) : m;
+    set({ models: next });
+    // Persist custom models (non-discovered ones)
+    try {
+      const custom = next.filter((m) => m.source === "custom");
+      localStorage.setItem("flowith-custom-models", JSON.stringify(custom));
+    } catch {}
+  },
 
   // Conversations
   conversations: loadConversations(),
