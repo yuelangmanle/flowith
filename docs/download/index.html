@@ -337,8 +337,9 @@ npm run dev</code></pre>
           <div class="install-body">
             <div class="install-step"><span class="num">1</span><div class="content"><h4>下载 DMG 文件</h4><p>根据你的 Mac 芯片选择对应版本：Apple Silicon 选 aarch64，Intel 选 x64</p></div></div>
             <div class="install-step"><span class="num">2</span><div class="content"><h4>打开 DMG 并拖入应用程序</h4><p>双击 .dmg 文件，将 Flowith 图标拖到"应用程序"文件夹</p></div></div>
-            <div class="install-step"><span class="num">3</span><div class="content"><h4>首次启动</h4><p>双击启动 Flowith。如提示"无法验证开发者"，前往 <code>系统设置 → 隐私与安全性</code>，点击"仍要打开"</p></div></div>
-            <div class="install-tip">&#9888;&#65039; macOS 安全提示：首次打开第三方应用时，系统可能会阻止运行。这是正常的安全机制，在隐私设置中允许即可。</div>
+            <div class="install-step"><span class="num">3</span><div class="content"><h4>解除安全限制</h4><p>打开终端，执行以下命令后即可正常启动：</p><code>xattr -cr /Applications/Flowith.app</code></div></div>
+            <div class="install-step"><span class="num">4</span><div class="content"><h4>启动 Flowith</h4><p>双击启动即可。如仍提示"无法验证开发者"，右键点击应用选择"打开"</p></div></div>
+            <div class="install-tip">&#9888;&#65039; macOS 安全提示：Flowith 是开源应用，未购买 Apple 开发者证书签名。首次安装需执行 <code>xattr -cr</code> 命令移除系统隔离标记，之后可正常启动。</div>
           </div>
         </div>
 

@@ -43,7 +43,8 @@
     "shortDescription": "Multi-AI Agent Workspace",
     "longDescription": "Flowith is a multi-AI agent collaboration platform that supports multiple model providers, roundtable discussions, code generation, and skill management.",
     "macOS": {
-      "minimumSystemVersion": "10.15"
+      "minimumSystemVersion": "10.15",
+      "signingIdentity": "-"
     },
     "windows": {
       "webviewInstallMode": {

@@ -72,7 +72,7 @@
 | macOS (Apple Silicon) | [Flowith_1.0.0_aarch64.dmg](https://github.com/yuelangmanle/flowith/releases/download/v1.0.0/Flowith_1.0.0_aarch64.dmg) |
 | Windows | [Releases 页面](https://github.com/yuelangmanle/flowith/releases) |
 
-**macOS 安装**：打开 .dmg → 拖入"应用程序" → 双击启动
+**macOS 安装**：打开 .dmg → 拖入"应用程序" → 执行 `xattr -cr /Applications/Flowith.app` → 双击启动
 **Windows 安装**：双击 .msi → 按提示安装 → 桌面图标启动
 
 ### 从源码运行
