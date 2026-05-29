@@ -453,23 +453,46 @@ export async function* handleHierarchicalStream(
 
 export async function handleTestProvider(state: AppState, body: { providerId: string }) {
   const provider = state.providers.find((p) => p.id === body.providerId);
-  if (!provider) return { ok: false, error: "Provider not found" };
+  if (!provider) return { ok: false, error: "未找到该供应商", errorZh: "未找到该供应商" };
+  if (!provider.apiKey && provider.type !== "ollama") {
+    return { ok: false, error: "API Key 未配置", errorZh: "请先配置 API Key", latencyMs: 0 };
+  }
   const start = Date.now();
   try {
     const models = await discoverModels(provider);
     return { ok: true, modelCount: models.length, latencyMs: Date.now() - start };
   } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err), latencyMs: Date.now() - start };
+    const msg = err instanceof Error ? err.message : String(err);
+    // Try fallback models if discovery endpoint fails
+    const fallback = getFallbackModels(provider);
+    if (fallback.length > 0) {
+      return { ok: true, modelCount: fallback.length, latencyMs: Date.now() - start, fallback: true, note: "使用默认模型列表（发现接口不可用）" };
+    }
+    return { ok: false, error: msg, errorZh: `连接失败: ${msg}`, latencyMs: Date.now() - start };
   }
 }
 
 export async function handleDiscoverModels(state: AppState, body: { providerId: string }) {
   const provider = state.providers.find((p) => p.id === body.providerId);
-  if (!provider) throw new Error("Provider not found");
-  const models = await discoverModels(provider);
-  provider.modelsDiscovered = models.length;
-  if (state.saveProviders) await state.saveProviders();
-  return { models, count: models.length };
+  if (!provider) throw new Error("未找到该供应商");
+  if (!provider.apiKey && provider.type !== "ollama") {
+    throw new Error("请先配置 API Key");
+  }
+  try {
+    const models = await discoverModels(provider);
+    provider.modelsDiscovered = models.length;
+    if (state.saveProviders) await state.saveProviders();
+    return { models, count: models.length };
+  } catch (err) {
+    // Fallback to default models
+    const fallback = getFallbackModels(provider);
+    if (fallback.length > 0) {
+      provider.modelsDiscovered = fallback.length;
+      if (state.saveProviders) await state.saveProviders();
+      return { models: fallback, count: fallback.length, fallback: true };
+    }
+    throw err;
+  }
 }
 
 export function handleDeleteAgent(state: AppState, agentId: string) {
