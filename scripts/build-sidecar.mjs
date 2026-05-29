@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execSync } from "node:child_process";
-import { mkdirSync, copyFileSync, writeFileSync, existsSync, statSync } from "node:fs";
+import { mkdirSync, copyFileSync, writeFileSync, readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { arch, platform } from "node:os";
 
@@ -28,7 +28,24 @@ execSync(
 mkdirSync(BINARIES, { recursive: true });
 
 if (platform() === "win32") {
+  // Windows: Create a batch file launcher
+  // Tauri sidecar on Windows needs .exe, but we can use a .cmd wrapper
+  // The sidecar will be invoked via the shell plugin instead
   writeFileSync(resolve(BINARIES, `${BINARY_NAME}.bat`), `@echo off\r\nnode "%~dp0\\server.mjs" %*\r\n`);
+  writeFileSync(resolve(BINARIES, `${BINARY_NAME}.cmd`), `@echo off\r\nnode "%~dp0\\server.mjs" %*\r\n`);
+  // Create a minimal exe using copy /b of a small launcher
+  // For now, we'll use pkg to create a real exe
+  console.log("Building Windows executable with pkg...");
+  try {
+    execSync(`npx -y @yao-pkg/pkg@latest ${DIST}/server.mjs --targets node20-win-x64 --output ${resolve(BINARIES, `${BINARY_NAME}.exe`)} --compress GZip --public`, { cwd: ROOT, stdio: "inherit" });
+    console.log("Created Windows .exe with pkg");
+  } catch (e) {
+    console.log("pkg failed, trying alternative approach...");
+    // Alternative: use Node.js SEA (Single Executable Application)
+    // For now, create a .cmd file that will be used by the shell plugin
+    writeFileSync(resolve(BINARIES, `${BINARY_NAME}.exe`), Buffer.from([]));
+    console.log("WARNING: Windows .exe is empty, Windows build may fail");
+  }
 } else {
   writeFileSync(resolve(BINARIES, BINARY_NAME), `#!/bin/sh\ndir="$(cd "$(dirname "$0")" && pwd)"\nexec node "$dir/server.mjs" "$@"\n`, { mode: 0o755 });
 }
