@@ -2,116 +2,120 @@ import { useState, useEffect } from "react";
 import { MobileNav } from "./MobileNav";
 import { MobileChatView } from "./MobileChatView";
 import { MobileRoundtableView } from "./MobileRoundtableView";
+import { MobileMemoryView } from "./MobileMemoryView";
+import { MobileSkillsView } from "./MobileSkillsView";
+import { MobileAgentsView } from "./MobileAgentsView";
+import { MobileCodeGenView } from "./MobileCodeGenView";
+import { MobileSettingsView } from "./MobileSettingsView";
+import { MobileSetupWizard } from "./MobileSetupWizard";
 import { useStore } from "../lib/store";
 import { apiFetch } from "../lib/shared";
 import { bootstrapMobile } from "../lib/mobileBootstrap";
-import type { ModelConfig, Skill, TTSProviderConfig, AgentTTSConfig } from "../core/types";
+import type { Skill } from "../core/types";
 
-type TabId = "chat" | "roundtable" | "memory" | "skills" | "settings";
-
-function MobileMemoryView() {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--bg-primary)" }}>
-      <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--border)" }}>
-        <h2 style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>记忆</h2>
-      </div>
-      <div style={{ flex: 1, overflow: "auto", padding: 16, color: "var(--text-muted)", fontSize: 13, textAlign: "center", paddingTop: 60 }}>
-        记忆管理功能开发中...
-      </div>
-    </div>
-  );
-}
-
-function MobileSkillsView() {
-  const { skills } = useStore();
-  return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--bg-primary)" }}>
-      <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--border)" }}>
-        <h2 style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>技能</h2>
-      </div>
-      <div style={{ flex: 1, overflow: "auto", padding: 16 }}>
-        {skills.length === 0 ? (
-          <div style={{ color: "var(--text-muted)", fontSize: 13, textAlign: "center", paddingTop: 60 }}>暂无已安装技能</div>
-        ) : (
-          skills.map((s) => (
-            <div key={s.id} style={{ padding: 12, marginBottom: 8, borderRadius: 12, background: "var(--bg-card)", border: "1px solid var(--border)" }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>{(s as any).nameZh ?? s.name}</div>
-              <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>{(s as any).descriptionZh ?? s.description}</div>
-            </div>
-          ))
-        )}
-      </div>
-    </div>
-  );
-}
-
-function MobileSettingsView() {
-  const { providers, setProviders, showToast, darkMode, toggleDarkMode } = useStore();
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--bg-primary)" }}>
-      <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--border)" }}>
-        <h2 style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>设置</h2>
-      </div>
-      <div style={{ flex: 1, overflow: "auto", padding: 16 }}>
-        <div style={{ marginBottom: 16 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)", marginBottom: 8 }}>模型供应商</h3>
-          {providers.filter((p) => p.enabled).map((p) => (
-            <div key={p.id} style={{ padding: 12, marginBottom: 8, borderRadius: 12, background: "var(--bg-card)", border: "1px solid var(--border)" }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>{p.name}</div>
-              <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{p.apiKey ? "已配置" : "未配置 API Key"}</div>
-            </div>
-          ))}
-        </div>
-
-        <div style={{ marginBottom: 16 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)", marginBottom: 8 }}>外观</h3>
-          <button onClick={toggleDarkMode} style={{
-            padding: "10px 16px", borderRadius: 12, border: "1px solid var(--border)",
-            background: "var(--bg-card)", color: "var(--text-primary)", fontSize: 13, cursor: "pointer", width: "100%", textAlign: "left",
-          }}>{darkMode ? "深色模式" : "浅色模式"}</button>
-        </div>
-      </div>
-    </div>
-  );
-}
+type TabId = "chat" | "roundtable" | "memory" | "skills" | "agents" | "codegen" | "settings";
 
 export function MobileApp() {
   const [activeTab, setActiveTab] = useState<TabId>("chat");
+  const [showSetup, setShowSetup] = useState(false);
+  const [loading, setLoading] = useState(true);
   const store = useStore();
 
   useEffect(() => {
-    // Bootstrap mobile adapter
+    // Check if first run
+    const setupDone = localStorage.getItem("flowith-setup-done");
+    if (!setupDone) {
+      setShowSetup(true);
+    }
+
+    // Bootstrap mobile adapter and load data
     bootstrapMobile().then(async () => {
-      // Load data from mobile storage
-      try {
-        const aResp = await apiFetch("/api/agents");
-        if (aResp.ok) { const d = await aResp.json(); if (Array.isArray(d) && d.length > 0) store.setAgents(d); }
-      } catch {}
+      // Parallel data loading
+      const loadTasks = [
+        { key: "agents", path: "/api/agents", setter: store.setAgents },
+        { key: "providers", path: "/api/providers", setter: store.setProviders },
+        { key: "conversations", path: "/api/conversations", setter: store.setConversations },
+      ];
 
-      try {
-        const pResp = await apiFetch("/api/providers");
-        if (pResp.ok) { const d = await pResp.json(); if (Array.isArray(d) && d.length > 0) store.setProviders(d); }
-      } catch {}
+      await Promise.allSettled(
+        loadTasks.map(async ({ path, setter }) => {
+          try {
+            const resp = await apiFetch(path);
+            if (resp.ok) {
+              const data = await resp.json();
+              if (Array.isArray(data) && data.length > 0) {
+                (setter as (v: unknown) => void)(data);
+              }
+            }
+          } catch {}
+        })
+      );
 
+      // Load skills separately (different type)
       try {
         const sResp = await apiFetch("/api/skills");
-        if (sResp.ok) { const d = await sResp.json() as Skill[]; if (Array.isArray(d)) store.setSkills(d); }
+        if (sResp.ok) {
+          const data = (await sResp.json()) as Skill[];
+          if (Array.isArray(data)) store.setSkills(data);
+        }
+      } catch {}
+
+      // Load TTS providers
+      try {
+        const tResp = await apiFetch("/api/tts-providers");
+        if (tResp.ok) {
+          const data = await tResp.json();
+          if (Array.isArray(data) && data.length > 0) store.setTTSProviders(data);
+        }
       } catch {}
 
       store.setServerConnected(true);
+      setLoading(false);
+    }).catch(() => {
+      setLoading(false);
     });
   }, []);
 
+  // Loading screen
+  if (loading) {
+    return (
+      <div style={{
+        height: "100vh", display: "flex", flexDirection: "column",
+        alignItems: "center", justifyContent: "center",
+        background: "var(--bg-primary)",
+      }}>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>🌊</div>
+        <div style={{
+          fontSize: 20, fontWeight: 700, color: "var(--text-primary)",
+          marginBottom: 8,
+        }}>Flowith</div>
+        <div style={{ fontSize: 13, color: "var(--text-muted)" }}>加载中...</div>
+        <div style={{
+          width: 40, height: 40, border: "3px solid var(--border)",
+          borderTop: "3px solid var(--primary)", borderRadius: "50%",
+          animation: "spin 0.8s linear infinite", marginTop: 20,
+        }} />
+      </div>
+    );
+  }
+
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", background: "var(--bg-primary)" }}>
+      {/* Setup wizard */}
+      {showSetup && <MobileSetupWizard onComplete={() => setShowSetup(false)} />}
+
+      {/* Main content */}
       <div style={{ flex: 1, overflow: "hidden", paddingBottom: 56 }}>
         {activeTab === "chat" && <MobileChatView />}
         {activeTab === "roundtable" && <MobileRoundtableView />}
         {activeTab === "memory" && <MobileMemoryView />}
         {activeTab === "skills" && <MobileSkillsView />}
+        {activeTab === "agents" && <MobileAgentsView />}
+        {activeTab === "codegen" && <MobileCodeGenView />}
         {activeTab === "settings" && <MobileSettingsView />}
       </div>
+
+      {/* Bottom nav */}
       <MobileNav active={activeTab} onChange={setActiveTab} />
     </div>
   );

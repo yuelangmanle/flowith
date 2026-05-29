@@ -614,7 +614,18 @@ function ChangelogSection() {
   const [expanded, setExpanded] = useState(false);
   const versions = [
     {
-      version: "v1.1.1",
+      version: "v1.3.0",
+      date: "2026-05-29",
+      changes: [
+        "📱 安卓端完整重做：所有功能对标桌面端",
+        "🧩 共享渲染组件提取：MessageRenderer、CodeBlock、ThinkingBlock、ImageLightbox",
+        "💬 移动端对话：markdown 渲染、代码高亮、思考过程、多图上传、文件附件",
+        "⚙️ 移动端完整设置、记忆管理、技能市场、Agent 管理、代码生成",
+        "🎉 移动端首次引导 SetupWizard",
+      ],
+    },
+    {
+      version: "v1.2.1",
       date: "2026-05-29",
       changes: [
         "🔧 修复 macOS x86_64 CI 构建失败问题",
@@ -654,7 +665,7 @@ function ChangelogSection() {
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 16 }}>📋</span>
           <span style={{ fontSize: 14, fontWeight: 600 }}>更新日志</span>
-          <span style={{ fontSize: 11, color: "var(--text-muted)", background: "var(--bg)", padding: "2px 8px", borderRadius: 4 }}>v1.1.1</span>
+          <span style={{ fontSize: 11, color: "var(--text-muted)", background: "var(--bg)", padding: "2px 8px", borderRadius: 4 }}>v1.3.0</span>
         </div>
         <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{expanded ? "收起" : "展开"}</span>
       </div>
