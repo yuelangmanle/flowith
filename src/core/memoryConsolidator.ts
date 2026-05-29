@@ -239,8 +239,17 @@ export function captureConversationMemory(
 
   // For other kinds, write to L1 first (will be consolidated later)
   if (decision.importance >= 0.7) {
-    // High importance: write directly to L3
-    return {
+    // High importance: write directly to L3 (with dedup)
+    const similar = findSimilarMemories(store, content, 0.7);
+    const existingHigh = similar.find(m => m.layer === "L3-fact");
+    if (existingHigh) {
+      existingHigh.content = content;
+      existingHigh.updatedAt = new Date().toISOString();
+      existingHigh.version = (existingHigh.version ?? 1) + 1;
+      existingHigh.lastUsedAt = new Date().toISOString();
+      return existingHigh;
+    }
+    const highItem: MemoryItem = {
       id: `mem-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       type: decision.kind === "user-preference" ? "persona" : "fact",
       layer: "L3-fact",
@@ -257,7 +266,9 @@ export function captureConversationMemory(
       hitCount: 0,
       sourceConversationId: conversationId,
       sourceMessageId: messageId,
-    } as MemoryItem;
+    };
+    store.items.push(highItem);
+    return highItem;
   }
 
   // Medium importance: write to L1

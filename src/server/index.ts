@@ -733,11 +733,21 @@ export async function createServer() {
       }
       if (request.method === "POST" && path === "/api/memory/import") {
         const body = await readJson(request) as { items?: MemoryItem[]; l1?: MemoryItem[]; l2?: MemoryItem[] };
-        if (body.items) memory.items.push(...body.items);
-        if (body.l1) memory.l1Buffer.push(...body.l1);
-        if (body.l2) memory.l2Buffer.push(...body.l2);
+        // Validate imported items
+        const validItems = (items: MemoryItem[] | undefined) => (items ?? []).filter(m => m && m.content && m.layer && m.type);
+        const vItems = validItems(body.items);
+        const vL1 = validItems(body.l1);
+        const vL2 = validItems(body.l2);
+        // Dedup on import
+        const existingContent = new Set([...memory.items, ...memory.l1Buffer, ...memory.l2Buffer].map(m => m.content.slice(0, 100)));
+        const deduped = [...vItems, ...vL1, ...vL2].filter(m => !existingContent.has(m.content.slice(0, 100)));
+        for (const item of deduped) {
+          if (item.layer === "L1-conversation") memory.l1Buffer.push(item);
+          else if (item.layer === "L2-working") memory.l2Buffer.push(item);
+          else memory.items.push(item);
+        }
         await saveMemoryToDisk();
-        return send(response, 200, { ok: true, imported: (body.items?.length ?? 0) + (body.l1?.length ?? 0) + (body.l2?.length ?? 0) });
+        return send(response, 200, { ok: true, imported: deduped.length, skipped: (vItems.length + vL1.length + vL2.length) - deduped.length });
       }
       if (request.method === "GET" && path.startsWith("/api/memory/relations/")) {
         const itemId = path.split("/").pop();
