@@ -11,6 +11,34 @@ export type ProviderType =
   | "openai-compatible"
   | "xiaomi-mimo";
 
+// ─── TTS Provider ───────────────────────────────────────────────
+
+export type TTSProviderType = "mimo-tts" | "openai-tts" | "edge-tts" | "fish-audio" | "custom-tts";
+
+export interface TTSProviderConfig {
+  id: string;
+  type: TTSProviderType;
+  name: string;
+  baseUrl: string;
+  apiKey: string;
+  enabled: boolean;
+  // Model / voice defaults
+  defaultModel?: string;
+  defaultVoice?: string;
+  defaultFormat?: "wav" | "mp3" | "pcm16";
+  defaultSpeed?: number;          // 0.5 - 2.0
+  defaultStylePrompt?: string;
+  // MiMo-specific
+  mimoAltBaseUrl?: string;        // token-plan-cn endpoint
+  // OpenAI-specific
+  openaiInstructions?: string;    // system-level TTS instructions
+  // Fish Audio-specific
+  fishReferenceId?: string;       // reference audio ID for voice cloning
+  // Custom endpoint
+  customHeaders?: Record<string, string>;
+  requestTemplate?: string;       // JSON template with {{text}}, {{voice}}, etc.
+}
+
 export interface ProviderConfig {
   id: string;
   name: string;
@@ -27,13 +55,13 @@ export interface ProviderConfig {
   altBaseUrl?: string;           // 第二个 URL (e.g. token-plan-cn)
   webSearchEnabled?: boolean;    // 联网搜索开关
   webSearchMaxKeyword?: number;  // 最大搜索关键词数
-  // TTS settings
-  ttsEnabled?: boolean;
-  ttsModel?: string;             // mimo-v2.5-tts / mimo-v2.5-tts-voicedesign / mimo-v2.5-tts-voiceclone
-  ttsVoice?: string;             // 内置音色 ID
-  ttsFormat?: "wav" | "mp3" | "pcm16";
-  ttsSpeed?: number;             // 0.5 - 2.0
-  ttsStylePrompt?: string;       // 自然语言风格指令
+  // DeepSeek-specific
+  reasoningEffort?: "low" | "medium" | "high";
+  // Qwen-specific
+  enableSearch?: boolean;        // 通义千问联网搜索
+  enableThinking?: boolean;      // qwen3 思考模式
+  // Moonshot-specific
+  moonshotWebSearch?: boolean;   // Kimi 联网搜索
 }
 
 export interface ModelCapabilities {
@@ -383,7 +411,7 @@ export interface StreamChunk {
   content?: string;
   toolCall?: Partial<ToolCallResult>;
   error?: string;
-  usage?: { prompt: number; completion: number };
+  usage?: { prompt: number; completion: number; cachedTokens?: number; cacheCreationTokens?: number };
   agentId?: string;
   agentName?: string;
   agentColor?: string;
@@ -399,8 +427,9 @@ export interface TTSRequest {
   voice?: string;             // 音色 ID
   format?: "wav" | "mp3" | "pcm16";
   speed?: number;
-  providerId?: string;
-  model?: string;             // mimo-v2.5-tts / mimo-v2.5-tts-voicedesign / mimo-v2.5-tts-voiceclone
+  ttsProviderId?: string;     // TTS provider ID (not chat provider)
+  model?: string;
+  instructions?: string;      // OpenAI TTS instructions
 }
 
 export interface TTSResponse {
@@ -459,10 +488,11 @@ export interface AgentModelConfig {
 export interface AgentTTSConfig {
   agentId: string;
   enabled: boolean;
+  ttsProviderId?: string;   // which TTS provider to use
   voice?: string;           // 音色 ID
   speed?: number;           // 0.5 - 2.0
   stylePrompt?: string;     // 风格指令
-  model?: string;           // tts model
+  model?: string;           // tts model override
   autoSpeak?: boolean;      // 自动朗读 AI 回复
 }
 
@@ -498,4 +528,86 @@ export interface DocsResearchResult {
   official: boolean;
   fetchedAt: string;
   relevanceScore: number;
+}
+
+
+// ─── Token Budget & Context ─────────────────────────────────────
+
+export interface TokenBudget {
+  maxInput: number;
+  maxOutput: number;
+  reservedForOverhead: number;
+}
+
+export interface CompressionStats {
+  originalTokens: number;
+  compressedTokens: number;
+  savedTokens: number;
+  compressionRatio: number;  // 0-1, lower = more compression
+  imagesStripped: number;
+  filesStripped: number;
+  messagesTruncated: number;
+  summariesCreated: number;
+}
+
+/** Model context window sizes (tokens). Unknown models default to 8192. */
+export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
+  // OpenAI
+  "gpt-4o": 128_000,
+  "gpt-4o-mini": 128_000,
+  "gpt-4.1": 1_048_576,
+  "gpt-4.1-mini": 1_048_576,
+  "gpt-4.1-nano": 1_048_576,
+  "o3": 200_000,
+  "o3-mini": 200_000,
+  "o4-mini": 200_000,
+  // Anthropic
+  "claude-sonnet-4-20250514": 200_000,
+  "claude-opus-4-20250514": 200_000,
+  "claude-3-5-sonnet-20241022": 200_000,
+  "claude-3-5-haiku-20241022": 200_000,
+  "claude-3-opus-20240229": 200_000,
+  // DeepSeek
+  "deepseek-chat": 64_000,
+  "deepseek-reasoner": 64_000,
+  // Qwen
+  "qwen-max": 131_072,
+  "qwen-plus": 131_072,
+  "qwen-turbo": 131_072,
+  "qwen3-235b-a22b": 131_072,
+  // Moonshot
+  "moonshot-v1-128k": 131_072,
+  "moonshot-v1-32k": 32_768,
+  "moonshot-v1-8k": 8_192,
+  // Gemini
+  "gemini-2.0-flash": 1_048_576,
+  "gemini-2.5-pro": 1_048_576,
+  "gemini-2.5-flash": 1_048_576,
+  // MiMo
+  "MiMo-GPT": 32_768,
+};
+
+/** Default context window for unknown models */
+export const DEFAULT_CONTEXT_WINDOW = 8_192;
+
+/** Lookup context window for a model ID (fuzzy match by prefix) */
+export function getModelContextWindow(modelId: string): number {
+  const lower = modelId.toLowerCase();
+  // Exact match
+  for (const [key, value] of Object.entries(MODEL_CONTEXT_WINDOWS)) {
+    if (lower === key.toLowerCase()) return value;
+  }
+  // Prefix match
+  for (const [key, value] of Object.entries(MODEL_CONTEXT_WINDOWS)) {
+    if (lower.startsWith(key.toLowerCase())) return value;
+  }
+  // Partial match (e.g. "gpt-4o-2024-08-06" matches "gpt-4o")
+  if (lower.includes("gpt-4o") || lower.includes("gpt-4.1")) return 128_000;
+  if (lower.includes("o3") || lower.includes("o4")) return 200_000;
+  if (lower.includes("claude")) return 200_000;
+  if (lower.includes("deepseek")) return 64_000;
+  if (lower.includes("qwen")) return 131_072;
+  if (lower.includes("gemini")) return 1_048_576;
+  if (lower.includes("moonshot")) return 131_072;
+  return DEFAULT_CONTEXT_WINDOW;
 }

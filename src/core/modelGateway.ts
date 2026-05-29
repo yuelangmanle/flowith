@@ -3,9 +3,12 @@ import type {
   ModelConfig,
   ProviderConfig,
   ProviderType,
-  ChatMessage,
+  TTSProviderConfig,
+  TTSProviderType,
   StreamChunk,
+  TokenBudget,
 } from "./types";
+import { estimateTokens } from "./tokenCounter";
 
 // ─── Provider Defaults ──────────────────────────────────────────
 
@@ -33,6 +36,32 @@ export function createDefaultProviders(): ProviderConfig[] {
   }));
 }
 
+// ─── TTS Provider Defaults ──────────────────────────────────────
+
+const ttsProviderDefaults: Array<[TTSProviderType, string, string]> = [
+  ["mimo-tts", "小米 MiMo TTS", "https://api.xiaomimimo.com/v1"],
+  ["openai-tts", "OpenAI TTS", "https://api.openai.com/v1"],
+  ["edge-tts", "Edge TTS (免费)", "https://speech.platform.bing.net"],
+  ["fish-audio", "Fish Audio", "https://api.fish.audio"],
+  ["custom-tts", "自定义 TTS", "http://localhost:9000"],
+];
+
+export function createDefaultTTSProviders(): TTSProviderConfig[] {
+  return ttsProviderDefaults.map(([type, name, baseUrl]) => ({
+    id: type,
+    type,
+    name,
+    baseUrl,
+    apiKey: "",
+    enabled: type === "mimo-tts",
+    defaultFormat: "wav",
+    defaultSpeed: 1.0,
+    ...(type === "mimo-tts" ? { defaultModel: "mimo-v2.5-tts", defaultVoice: "mimo_default" } : {}),
+    ...(type === "openai-tts" ? { defaultModel: "tts-1", defaultVoice: "alloy" } : {}),
+    ...(type === "fish-audio" ? { defaultModel: "fish-speech-1.5" } : {}),
+  }));
+}
+
 // ─── Model Discovery ────────────────────────────────────────────
 
 export async function discoverModels(
@@ -50,16 +79,12 @@ export async function discoverModels(
     return (body.models ?? []).map((model) => toModel(provider, model.name));
   }
 
+  // Anthropic doesn't have a public /models endpoint
   if (provider.type === "anthropic") {
     return getFallbackModels(provider);
   }
 
-  const url = `${provider.baseUrl.replace(/\/$/, "")}/models`;
-  const headers: Record<string, string> = {};
-  if (provider.apiKey) {
-    headers["Authorization"] = `Bearer ${provider.apiKey}`;
-    if (provider.type === "xiaomi-mimo") headers["api-key"] = provider.apiKey;
-  }
+  // Gemini uses a different URL format with API key
   if (provider.type === "gemini") {
     const geminiUrl = `${provider.baseUrl.replace(/\/$/, "")}/models?key=${provider.apiKey}`;
     const response = await fetcher(geminiUrl);
@@ -68,6 +93,16 @@ export async function discoverModels(
       models?: Array<{ name: string; displayName?: string }>;
     };
     return (body.models ?? []).map((m) => toModel(provider, m.name.replace("models/", "")));
+  }
+
+  // OpenAI-compatible: openai, deepseek, qwen, moonshot, xiaomi-mimo, custom
+  const discoverBase = provider.altBaseUrl || provider.baseUrl;
+  const url = `${discoverBase.replace(/\/$/, "")}/models`;
+  const headers: Record<string, string> = {};
+  if (provider.apiKey) {
+    headers["Authorization"] = `Bearer ${provider.apiKey}`;
+    // MiMo also accepts api-key header
+    if (provider.type === "xiaomi-mimo") headers["api-key"] = provider.apiKey;
   }
 
   const response = await fetcher(url, { headers });
@@ -83,14 +118,14 @@ export async function discoverModels(
 
 export function getFallbackModels(provider: ProviderConfig): ModelConfig[] {
   const candidates: Record<ProviderType, string[]> = {
-    openai: ["gpt-4.1", "gpt-4.1-mini", "gpt-4o", "gpt-4o-mini", "o3-mini", "text-embedding-3-small"],
-    anthropic: ["claude-sonnet-4-20250514", "claude-haiku-4-20250514"],
-    gemini: ["gemini-2.5-pro", "gemini-2.5-flash"],
+    openai: ["gpt-4.1", "gpt-4.1-mini", "gpt-4o", "gpt-4o-mini", "o3-mini", "o3", "o4-mini", "text-embedding-3-small"],
+    anthropic: ["claude-sonnet-4-20250514", "claude-haiku-4-20250514", "claude-opus-4-20250514"],
+    gemini: ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash"],
     deepseek: ["deepseek-chat", "deepseek-reasoner"],
     qwen: ["qwen-plus", "qwen-max", "qwen-turbo", "qwen3-235b-a22b", "qwen-vl-max", "text-embedding-v4"],
     moonshot: ["kimi-k2", "moonshot-v1-128k", "moonshot-v1-32k"],
     ollama: ["llama3.2:latest", "qwen2.5-coder:latest"],
-    "xiaomi-mimo": ["mimo-v2.5-pro", "mimo-v2.5", "mimo-v2-flash", "mimo-v2.5-tts"],
+    "xiaomi-mimo": ["mimo-v2.5-pro", "mimo-v2.5", "mimo-v2-flash", "mimo-v2-omni"],
     "openai-compatible": ["local-model", "openai-compatible-chat"],
   };
   return (candidates[provider.type] ?? []).map((id) => toModel(provider, id));
@@ -115,43 +150,52 @@ export function mergeDiscoveredModels(
   return existing.map((model) => ({ ...model, stale: true, lastError: error }));
 }
 
-// ─── Real Chat Completion ───────────────────────────────────────
-
-export interface ImageContent {
-  type: "image_url";
-  image_url: { url: string; detail?: "auto" | "low" | "high" };
-}
-
-export interface TextContent {
-  type: "text";
-  text: string;
-}
-
-export type MessageContent = string | Array<TextContent | ImageContent>;
+// ─── Chat Completion ────────────────────────────────────────────
 
 export interface ChatCompletionRequest {
   provider: ProviderConfig;
   model: string;
-  messages: Array<{ role: string; content: MessageContent }>;
-  stream?: boolean;
+  messages: Array<{ role: string; content: string; imageData?: string; additionalImages?: string[] }>;
   temperature?: number;
   maxTokens?: number;
-  // MiMo web search
+  stream?: boolean;
   enableWebSearch?: boolean;
   webSearchMaxKeyword?: number;
+  tokenBudget?: TokenBudget;
 }
+
+function buildChatMessages(msgs: ChatCompletionRequest["messages"]): Array<{ role: string; content: string | Array<Record<string, unknown>> }> {
+  return msgs.map((m) => {
+    // Build multimodal content if images present
+    if (m.imageData) {
+      const parts: Array<Record<string, unknown>> = [{ type: "text", text: m.content }];
+      parts.push({ type: "image_url", image_url: { url: m.imageData } });
+      if (m.additionalImages) {
+        for (const img of m.additionalImages) {
+          parts.push({ type: "image_url", image_url: { url: img } });
+        }
+      }
+      return { role: m.role, content: parts };
+    }
+    return { role: m.role, content: m.content };
+  });
+}
+
+// ─── Provider-Specific Chat (Non-streaming) ─────────────────────
 
 export async function callChatCompletion(
   req: ChatCompletionRequest,
   fetcher: typeof fetch = fetch
-): Promise<{ content: string; usage?: { prompt: number; completion: number } }> {
+): Promise<{ content: string; reasoningContent?: string; usage?: { prompt: number; completion: number; cachedTokens?: number; cacheCreationTokens?: number } }> {
   const provider = req.provider;
   const model = req.model;
 
+  // Anthropic has its own API format
   if (provider.type === "anthropic") {
     return callAnthropic(req, fetcher);
   }
 
+  // Gemini has its own API format
   if (provider.type === "gemini") {
     return callGemini(req, fetcher);
   }
@@ -161,38 +205,19 @@ export async function callChatCompletion(
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (provider.apiKey) {
     headers["Authorization"] = `Bearer ${provider.apiKey}`;
-    // MiMo supports both auth methods
     if (provider.type === "xiaomi-mimo") headers["api-key"] = provider.apiKey;
   }
 
-  // Build request body with provider-specific optimizations
   const bodyObj: Record<string, unknown> = {
     model,
-    messages: req.messages,
-    temperature: req.temperature ?? 0.7,
-    max_tokens: req.maxTokens ?? 4096,
+    messages: buildChatMessages(req.messages),
     stream: false,
   };
 
-  // DeepSeek: reasoning models work best with temperature=0 (or omit)
-  if (provider.type === "deepseek" && model.includes("reasoner")) {
-    bodyObj.temperature = 0;
-  }
-
-  // MiMo: inject web search tools when enabled
-  if (provider.type === "xiaomi-mimo") {
-    bodyObj.thinking = { type: "disabled" };
-    if (req.enableWebSearch ?? provider.webSearchEnabled) {
-      bodyObj.tools = [{
-        type: "web_search",
-        max_keyword: req.webSearchMaxKeyword ?? provider.webSearchMaxKeyword ?? 3,
-        force_search: true,
-      }];
-    }
-  }
+  // ── Provider-specific parameters ──
+  applyProviderParams(provider, model, bodyObj, req);
 
   const body = JSON.stringify(bodyObj);
-
   const response = await fetcher(url, { method: "POST", headers, body });
   if (!response.ok) {
     const errText = await response.text().catch(() => "");
@@ -200,17 +225,21 @@ export async function callChatCompletion(
   }
 
   const data = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
-    usage?: { prompt_tokens: number; completion_tokens: number };
+    choices?: Array<{ message?: { content?: string; reasoning_content?: string; tool_calls?: unknown[] } }>;
+    usage?: { prompt_tokens: number; completion_tokens: number; total_tokens?: number };
   };
 
-  const content = data.choices?.[0]?.message?.content ?? "";
+  const choice = data.choices?.[0]?.message;
+  const content = choice?.content ?? "";
+  const reasoningContent = (choice as Record<string, unknown>)?.reasoning_content as string | undefined;
   const usage = data.usage
-    ? { prompt: data.usage.prompt_tokens, completion: data.usage.completion_tokens }
+    ? { prompt: data.usage.prompt_tokens, completion: data.usage.completion_tokens, cachedTokens: (data.usage as Record<string, unknown>).cached_tokens as number ?? 0 }
     : undefined;
 
-  return { content, usage };
+  return { content, reasoningContent, usage };
 }
+
+// ─── Provider-Specific Streaming ────────────────────────────────
 
 export async function* streamChatCompletion(
   req: ChatCompletionRequest,
@@ -236,128 +265,277 @@ export async function* streamChatCompletion(
     if (provider.type === "xiaomi-mimo") headers["api-key"] = provider.apiKey;
   }
 
-  // Build request body with provider-specific optimizations
-  const streamBodyObj: Record<string, unknown> = {
+  const bodyObj: Record<string, unknown> = {
     model: req.model,
-    messages: req.messages,
-    temperature: req.temperature ?? 0.7,
-    max_tokens: req.maxTokens ?? 4096,
+    messages: buildChatMessages(req.messages),
     stream: true,
   };
 
-  // DeepSeek: reasoning models work best with temperature=0
-  if (provider.type === "deepseek" && req.model.includes("reasoner")) {
-    streamBodyObj.temperature = 0;
-  }
+  // Provider-specific parameters
+  applyProviderParams(provider, req.model, bodyObj, req);
 
-  // MiMo: inject web search tools when enabled
-  if (provider.type === "xiaomi-mimo") {
-    streamBodyObj.thinking = { type: "disabled" };
-    if (req.enableWebSearch ?? provider.webSearchEnabled) {
-      streamBodyObj.tools = [{
-        type: "web_search",
-        max_keyword: req.webSearchMaxKeyword ?? provider.webSearchMaxKeyword ?? 3,
-        force_search: true,
-      }];
-    }
-  }
-
-  const body = JSON.stringify(streamBodyObj);
-
+  const body = JSON.stringify(bodyObj);
   const response = await fetcher(url, { method: "POST", headers, body });
   if (!response.ok) {
     const errText = await response.text().catch(() => "");
-    throw new Error(`API error ${response.status}: ${errText.slice(0, 300)}`);
+    yield { type: "error", error: `API error ${response.status}: ${errText.slice(0, 300)}` };
+    return;
   }
 
+  // Parse SSE stream
   const reader = response.body?.getReader();
   if (!reader) {
-    const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
-    yield { type: "text", content: data.choices?.[0]?.message?.content ?? "" };
-    yield { type: "done" };
+    yield { type: "error", error: "No response body" };
     return;
   }
 
   const decoder = new TextDecoder();
   let buffer = "";
+  let reasoningBuffer = "";
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
 
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
 
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed === "data: [DONE]") continue;
-      if (!trimmed.startsWith("data: ")) continue;
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed === "data: [DONE]") continue;
+        if (!trimmed.startsWith("data: ")) continue;
 
-      try {
-        const payload = JSON.parse(trimmed.slice(6)) as {
-          choices?: Array<{ delta?: { content?: string }; finish_reason?: string }>;
-          usage?: { prompt_tokens: number; completion_tokens: number };
-        };
-
-        const delta = payload.choices?.[0]?.delta?.content;
-        if (delta) yield { type: "text", content: delta };
-
-        if (payload.choices?.[0]?.finish_reason === "stop" && payload.usage) {
-          yield {
-            type: "usage",
-            usage: { prompt: payload.usage.prompt_tokens, completion: payload.usage.completion_tokens },
+        try {
+          const chunk = JSON.parse(trimmed.slice(6)) as {
+            choices?: Array<{ delta?: { content?: string; reasoning_content?: string; tool_calls?: unknown[] }; finish_reason?: string }>;
+            usage?: { prompt_tokens: number; completion_tokens: number };
           };
+
+          const delta = chunk.choices?.[0]?.delta;
+          if (delta?.content) {
+            // Flush reasoning buffer before content
+            if (reasoningBuffer) {
+              yield { type: "text", content: `<think>${reasoningBuffer}</think>` };
+              reasoningBuffer = "";
+            }
+            yield { type: "text", content: delta.content };
+          }
+          // DeepSeek reasoning_content in streaming
+          const rContent = (delta as Record<string, unknown>)?.reasoning_content as string | undefined;
+          if (rContent) {
+            yield { type: "text", content: `[思考] ${rContent}\n[/思考]\n` };
+          }
+          if (chunk.usage) {
+            yield {
+              type: "usage",
+              usage: {
+                prompt: chunk.usage.prompt_tokens,
+                completion: chunk.usage.completion_tokens,
+                cachedTokens: (chunk.usage as Record<string, unknown>).cached_tokens as number ?? 0,
+              },
+            };
+          }
+        } catch {
+          // skip malformed chunks
         }
-      } catch {
-        // skip malformed lines
       }
     }
+  } finally {
+    reader.releaseLock();
   }
 
+  // Flush any remaining reasoning buffer
+  if (reasoningBuffer) {
+    yield { type: "text", content: `<think>${reasoningBuffer}</think>` };
+  }
   yield { type: "done" };
 }
 
-// ─── Anthropic ──────────────────────────────────────────────────
+// ─── Provider-Specific Parameter Building ───────────────────────
+
+/** Infer optimal max_tokens based on message content length */
+function inferMaxTokens(messages: Array<{ role: string; content: string }>): number {
+  let totalInput = 0;
+  for (const msg of messages) {
+    totalInput += estimateTokens(msg.content);
+  }
+  if (totalInput < 100) return 1024;
+  if (totalInput < 500) return 2048;
+  return 4096;
+}
+
+function applyProviderParams(
+  provider: ProviderConfig,
+  model: string,
+  body: Record<string, unknown>,
+  req: ChatCompletionRequest
+): void {
+  const lower = model.toLowerCase();
+
+  switch (provider.type) {
+    case "openai": {
+      // o-series reasoning models: use reasoning_effort, no temperature
+      if (lower.startsWith("o3") || lower.startsWith("o4") || lower.startsWith("o1")) {
+        body.reasoning_effort = provider.reasoningEffort ?? "medium";
+        // o-series don't support temperature
+        delete body.temperature;
+      } else {
+        body.temperature = req.temperature ?? 0.7;
+        body.max_tokens = req.maxTokens ?? inferMaxTokens(req.messages);
+      }
+      break;
+    }
+
+    case "deepseek": {
+      // deepseek-reasoner: temperature must be 0 or omitted
+      if (lower.includes("reasoner")) {
+        body.temperature = 0;
+        // Don't set max_tokens for reasoner — it uses max_reasoning_tokens
+      } else {
+        body.temperature = req.temperature ?? 0.7;
+        body.max_tokens = req.maxTokens ?? inferMaxTokens(req.messages);
+      }
+      // DeepSeek supports tool_choice
+      break;
+    }
+
+    case "qwen": {
+      body.temperature = req.temperature ?? 0.7;
+      body.max_tokens = req.maxTokens ?? inferMaxTokens(req.messages);
+      // qwen3 thinking mode
+      if (lower.startsWith("qwen3") && provider.enableThinking) {
+        body.enable_thinking = true;
+      }
+      // Qwen web search
+      if (req.enableWebSearch ?? provider.enableSearch) {
+        body.enable_search = true;
+      }
+      break;
+    }
+
+    case "moonshot": {
+      body.temperature = req.temperature ?? 0.7;
+      body.max_tokens = req.maxTokens ?? inferMaxTokens(req.messages);
+      // kimi-k2 is a reasoning model — lower temperature helps
+      if (lower.includes("k2")) {
+        body.temperature = req.temperature ?? 0.3;
+      }
+      // Moonshot web search via tool
+      if (req.enableWebSearch ?? provider.moonshotWebSearch) {
+        body.tools = [{
+          type: "builtin_function",
+          function: { name: "$web_search" },
+        }];
+      }
+      break;
+    }
+
+    case "xiaomi-mimo": {
+      body.temperature = req.temperature ?? 0.7;
+      body.max_tokens = req.maxTokens ?? inferMaxTokens(req.messages);
+      body.thinking = { type: "disabled" };
+      // MiMo web search tools — only add when explicitly enabled by user
+      const mimoWebSearch = req.enableWebSearch === true || (req.enableWebSearch !== false && provider.webSearchEnabled === true);
+      if (mimoWebSearch) {
+        body.tools = [{
+          type: "web_search",
+          max_keyword: req.webSearchMaxKeyword ?? provider.webSearchMaxKeyword ?? 3,
+        }];
+      }
+      break;
+    }
+
+    case "ollama": {
+      body.temperature = req.temperature ?? 0.7;
+      // Ollama doesn't always support max_tokens
+      break;
+    }
+
+    case "openai-compatible": {
+      body.temperature = req.temperature ?? 0.7;
+      body.max_tokens = req.maxTokens ?? inferMaxTokens(req.messages);
+      break;
+    }
+
+    default: {
+      body.temperature = req.temperature ?? 0.7;
+      body.max_tokens = req.maxTokens ?? inferMaxTokens(req.messages);
+    }
+  }
+}
+
+// ─── Anthropic (Messages API) ───────────────────────────────────
 
 async function callAnthropic(
   req: ChatCompletionRequest,
   fetcher: typeof fetch
-): Promise<{ content: string; usage?: { prompt: number; completion: number } }> {
+): Promise<{ content: string; reasoningContent?: string; usage?: { prompt: number; completion: number; cachedTokens?: number; cacheCreationTokens?: number } }> {
   const url = `${req.provider.baseUrl.replace(/\/$/, "")}/messages`;
-  const systemMsg = req.messages.find((m) => m.role === "system");
-  const nonSystem = req.messages.filter((m) => m.role !== "system");
-
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     "x-api-key": req.provider.apiKey,
     "anthropic-version": "2023-06-01",
+    "anthropic-beta": "prompt-caching-2024-07-31",
   };
 
-  const body = JSON.stringify({
-    model: req.model,
-    max_tokens: req.maxTokens ?? 4096,
-    system: systemMsg?.content,
-    messages: nonSystem.map((m) => ({ role: m.role, content: m.content })),
-  });
+  // Extract system message
+  const systemMsg = req.messages.find((m) => m.role === "system");
+  const nonSystemMsgs = req.messages.filter((m) => m.role !== "system");
 
+  const dynamicMaxTokens = req.maxTokens ?? inferMaxTokens(req.messages);
+
+  const bodyObj: Record<string, unknown> = {
+    model: req.model,
+    max_tokens: dynamicMaxTokens,
+    messages: nonSystemMsgs.map((m) => ({ role: m.role, content: m.content })),
+  };
+  // Use array format with cache_control for system message (Anthropic prompt caching)
+  if (systemMsg) {
+    bodyObj.system = [{ type: "text", text: systemMsg.content, cache_control: { type: "ephemeral" } }];
+  }
+
+  // Claude Sonnet/Opus 4: enable extended thinking
+  if (req.model.includes("sonnet-4") || req.model.includes("opus-4")) {
+    bodyObj.thinking = { type: "enabled", budget_tokens: Math.min(dynamicMaxTokens, 10000) };
+    // Extended thinking requires temperature=1
+    bodyObj.temperature = 1;
+  } else {
+    bodyObj.temperature = req.temperature ?? 0.7;
+  }
+
+  const body = JSON.stringify(bodyObj);
   const response = await fetcher(url, { method: "POST", headers, body });
   if (!response.ok) {
     const errText = await response.text().catch(() => "");
-    throw new Error(`Anthropic API error ${response.status}: ${errText.slice(0, 300)}`);
+    throw new Error(`Anthropic error ${response.status}: ${errText.slice(0, 300)}`);
   }
 
   const data = (await response.json()) as {
-    content?: Array<{ text?: string }>;
-    usage?: { input_tokens: number; output_tokens: number };
+    content?: Array<{ type: string; text?: string; thinking?: string }>;
+    usage?: { input_tokens: number; output_tokens: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number };
   };
 
-  const content = data.content?.map((c) => c.text ?? "").join("") ?? "";
+  // Extract text and thinking blocks
+  let content = "";
+  let reasoningContent = "";
+  for (const block of data.content ?? []) {
+    if (block.type === "thinking") {
+      reasoningContent += (block as Record<string, unknown>).thinking as string ?? "";
+    } else {
+      // Default to text if type is missing or "text"
+      content += block.text ?? "";
+    }
+  }
+
+  const cachedTokens = (data.usage?.cache_read_input_tokens ?? 0);
+  const cacheCreationTokens = (data.usage?.cache_creation_input_tokens ?? 0);
   const usage = data.usage
-    ? { prompt: data.usage.input_tokens, completion: data.usage.output_tokens }
+    ? { prompt: data.usage.input_tokens, completion: data.usage.output_tokens, cachedTokens, cacheCreationTokens }
     : undefined;
 
-  return { content, usage };
+  return { content, reasoningContent: reasoningContent || undefined, usage };
 }
 
 async function* streamAnthropic(
@@ -365,196 +543,258 @@ async function* streamAnthropic(
   fetcher: typeof fetch
 ): AsyncGenerator<StreamChunk> {
   const url = `${req.provider.baseUrl.replace(/\/$/, "")}/messages`;
-  const systemMsg = req.messages.find((m) => m.role === "system");
-  const nonSystem = req.messages.filter((m) => m.role !== "system");
-
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     "x-api-key": req.provider.apiKey,
     "anthropic-version": "2023-06-01",
+    "anthropic-beta": "prompt-caching-2024-07-31",
   };
 
-  const body = JSON.stringify({
-    model: req.model,
-    max_tokens: req.maxTokens ?? 4096,
-    system: systemMsg?.content,
-    messages: nonSystem.map((m) => ({ role: m.role, content: m.content })),
-    stream: true,
-  });
+  const systemMsg = req.messages.find((m) => m.role === "system");
+  const nonSystemMsgs = req.messages.filter((m) => m.role !== "system");
 
+  const dynamicMaxTokens = req.maxTokens ?? inferMaxTokens(req.messages);
+
+  const bodyObj: Record<string, unknown> = {
+    model: req.model,
+    max_tokens: dynamicMaxTokens,
+    messages: nonSystemMsgs.map((m) => ({ role: m.role, content: m.content })),
+    stream: true,
+  };
+  // Use array format with cache_control for system message (Anthropic prompt caching)
+  if (systemMsg) {
+    bodyObj.system = [{ type: "text", text: systemMsg.content, cache_control: { type: "ephemeral" } }];
+  }
+
+  if (req.model.includes("sonnet-4") || req.model.includes("opus-4")) {
+    bodyObj.thinking = { type: "enabled", budget_tokens: Math.min(dynamicMaxTokens, 10000) };
+    bodyObj.temperature = 1;
+  } else {
+    bodyObj.temperature = req.temperature ?? 0.7;
+  }
+
+  const body = JSON.stringify(bodyObj);
   const response = await fetcher(url, { method: "POST", headers, body });
   if (!response.ok) {
     const errText = await response.text().catch(() => "");
-    throw new Error(`Anthropic API error ${response.status}: ${errText.slice(0, 300)}`);
-  }
-
-  const reader = response.body?.getReader();
-  if (!reader) {
-    const data = await callAnthropic(req, fetcher);
-    yield { type: "text", content: data.content };
-    yield { type: "done" };
+    yield { type: "error", error: `Anthropic error ${response.status}: ${errText.slice(0, 300)}` };
     return;
   }
 
+  const reader = response.body?.getReader();
+  if (!reader) { yield { type: "error", error: "No response body" }; return; }
+
   const decoder = new TextDecoder();
   let buffer = "";
+  let thinkingBuffer = "";
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
 
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
 
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed.startsWith("data: ")) continue;
-      try {
-        const event = JSON.parse(trimmed.slice(6)) as {
-          type?: string;
-          delta?: { type?: string; text?: string };
-          usage?: { input_tokens: number; output_tokens: number };
-        };
-
-        if (event.type === "content_block_delta" && event.delta?.text) {
-          yield { type: "text", content: event.delta.text };
-        }
-
-        if (event.type === "message_delta" && event.usage) {
-          yield { type: "usage", usage: { prompt: 0, completion: event.usage.output_tokens } };
-        }
-      } catch {
-        // skip
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith("data: ")) continue;
+        try {
+          const event = JSON.parse(trimmed.slice(6)) as Record<string, unknown>;
+          if (event.type === "content_block_delta") {
+            const delta = event.delta as Record<string, unknown> | undefined;
+            if (delta?.type === "text_delta" && delta.text) {
+              // Flush thinking buffer before text content
+              if (thinkingBuffer) {
+                yield { type: "text", content: `<think>${thinkingBuffer}</think>` };
+                thinkingBuffer = "";
+              }
+              yield { type: "text", content: delta.text as string };
+            }
+            if (delta?.type === "thinking_delta" && delta.thinking) {
+              yield { type: "text", content: `[思考] ${delta.thinking}\n[/思考]\n` };
+            }
+          }
+          if (event.type === "message_delta") {
+            const usage = event.usage as { input_tokens?: number; output_tokens?: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number } | undefined;
+            if (usage) {
+              yield {
+                type: "usage",
+                usage: {
+                  prompt: usage.input_tokens ?? 0,
+                  completion: usage.output_tokens ?? 0,
+                  cachedTokens: usage.cache_read_input_tokens ?? 0,
+                  cacheCreationTokens: usage.cache_creation_input_tokens ?? 0,
+                },
+              };
+            }
+          }
+        } catch { /* skip */ }
       }
     }
+  } finally {
+    reader.releaseLock();
   }
-
+  // Flush remaining thinking buffer
+  if (thinkingBuffer) {
+    yield { type: "text", content: `<think>${thinkingBuffer}</think>` };
+  }
   yield { type: "done" };
 }
 
-// ─── Gemini ─────────────────────────────────────────────────────
+// ─── Gemini (GenerateContent API) ───────────────────────────────
 
 async function callGemini(
   req: ChatCompletionRequest,
   fetcher: typeof fetch
-): Promise<{ content: string; usage?: { prompt: number; completion: number } }> {
-  const url = `${req.provider.baseUrl.replace(/\/$/, "")}/models/${req.model}:generateContent?key=${req.provider.apiKey}`;
+): Promise<{ content: string; reasoningContent?: string; usage?: { prompt: number; completion: number; cachedTokens?: number; cacheCreationTokens?: number } }> {
+  const base = req.provider.baseUrl.replace(/\/$/, "");
+  const url = `${base}/models/${req.model}:generateContent?key=${req.provider.apiKey}`;
 
-  const contents = req.messages
-    .filter((m) => m.role !== "system")
-    .map((m) => ({
-      role: m.role === "assistant" ? "model" : "user",
-      parts: [{ text: m.content }],
-    }));
+  const systemMsg = req.messages.find((m) => m.role === "system");
+  const nonSystemMsgs = req.messages.filter((m) => m.role !== "system");
 
-  const systemInstruction = req.messages.find((m) => m.role === "system");
+  const contents = nonSystemMsgs.map((m) => ({
+    role: m.role === "assistant" ? "model" : "user",
+    parts: [{ text: m.content }],
+  }));
 
-  const body = JSON.stringify({
-    contents,
-    ...(systemInstruction ? { systemInstruction: { parts: [{ text: systemInstruction.content }] } } : {}),
-    generationConfig: { temperature: req.temperature ?? 0.7, maxOutputTokens: req.maxTokens ?? 4096 },
-  });
+  const bodyObj: Record<string, unknown> = { contents };
+  if (systemMsg) {
+    bodyObj.systemInstruction = { parts: [{ text: systemMsg.content }] };
+  }
 
-  const response = await fetcher(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body,
-  });
+  // Gemini 2.5 thinking config
+  const lower = req.model.toLowerCase();
+  if (lower.includes("2.5")) {
+    bodyObj.generationConfig = {
+      temperature: req.temperature ?? 0.7,
+      maxOutputTokens: req.maxTokens ?? 4096,
+      thinkingConfig: { includeThoughts: true },
+    };
+  } else {
+    bodyObj.generationConfig = {
+      temperature: req.temperature ?? 0.7,
+      maxOutputTokens: req.maxTokens ?? 4096,
+    };
+  }
 
+  const body = JSON.stringify(bodyObj);
+  const response = await fetcher(url, { method: "POST", headers: { "Content-Type": "application/json" }, body });
   if (!response.ok) {
     const errText = await response.text().catch(() => "");
-    throw new Error(`Gemini API error ${response.status}: ${errText.slice(0, 300)}`);
+    throw new Error(`Gemini error ${response.status}: ${errText.slice(0, 300)}`);
   }
 
   const data = (await response.json()) as {
-    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string; thought?: boolean }> } }>;
     usageMetadata?: { promptTokenCount: number; candidatesTokenCount: number };
   };
 
-  const content =
-    data.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
+  let content = "";
+  let reasoningContent = "";
+  for (const part of data.candidates?.[0]?.content?.parts ?? []) {
+    if (part.thought) reasoningContent += part.text ?? "";
+    else content += part.text ?? "";
+  }
+
   const usage = data.usageMetadata
     ? { prompt: data.usageMetadata.promptTokenCount, completion: data.usageMetadata.candidatesTokenCount }
     : undefined;
 
-  return { content, usage };
+  return { content, reasoningContent: reasoningContent || undefined, usage };
 }
 
 async function* streamGemini(
   req: ChatCompletionRequest,
   fetcher: typeof fetch
 ): AsyncGenerator<StreamChunk> {
-  const url = `${req.provider.baseUrl.replace(/\/$/, "")}/models/${req.model}:streamGenerateContent?alt=sse&key=${req.provider.apiKey}`;
+  const base = req.provider.baseUrl.replace(/\/$/, "");
+  const url = `${base}/models/${req.model}:streamGenerateContent?alt=sse&key=${req.provider.apiKey}`;
 
-  const contents = req.messages
-    .filter((m) => m.role !== "system")
-    .map((m) => ({
-      role: m.role === "assistant" ? "model" : "user",
-      parts: [{ text: m.content }],
-    }));
+  const systemMsg = req.messages.find((m) => m.role === "system");
+  const nonSystemMsgs = req.messages.filter((m) => m.role !== "system");
 
-  const systemInstruction = req.messages.find((m) => m.role === "system");
+  const contents = nonSystemMsgs.map((m) => ({
+    role: m.role === "assistant" ? "model" : "user",
+    parts: [{ text: m.content }],
+  }));
 
-  const body = JSON.stringify({
-    contents,
-    ...(systemInstruction ? { systemInstruction: { parts: [{ text: systemInstruction.content }] } } : {}),
-    generationConfig: { temperature: req.temperature ?? 0.7, maxOutputTokens: req.maxTokens ?? 4096 },
-  });
+  const bodyObj: Record<string, unknown> = { contents };
+  if (systemMsg) bodyObj.systemInstruction = { parts: [{ text: systemMsg.content }] };
 
-  const response = await fetcher(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body,
-  });
+  const lower = req.model.toLowerCase();
+  if (lower.includes("2.5")) {
+    bodyObj.generationConfig = {
+      temperature: req.temperature ?? 0.7,
+      maxOutputTokens: req.maxTokens ?? 4096,
+      thinkingConfig: { includeThoughts: true },
+    };
+  } else {
+    bodyObj.generationConfig = {
+      temperature: req.temperature ?? 0.7,
+      maxOutputTokens: req.maxTokens ?? 4096,
+    };
+  }
 
+  const body = JSON.stringify(bodyObj);
+  const response = await fetcher(url, { method: "POST", headers: { "Content-Type": "application/json" }, body });
   if (!response.ok) {
     const errText = await response.text().catch(() => "");
-    throw new Error(`Gemini API error ${response.status}: ${errText.slice(0, 300)}`);
+    yield { type: "error", error: `Gemini error ${response.status}: ${errText.slice(0, 300)}` };
+    return;
   }
 
   const reader = response.body?.getReader();
-  if (!reader) {
-    const data = await callGemini(req, fetcher);
-    yield { type: "text", content: data.content };
-    yield { type: "done" };
-    return;
-  }
+  if (!reader) { yield { type: "error", error: "No response body" }; return; }
 
   const decoder = new TextDecoder();
   let buffer = "";
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
 
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
 
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed.startsWith("data: ")) continue;
-      try {
-        const payload = JSON.parse(trimmed.slice(6)) as {
-          candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-          usageMetadata?: { promptTokenCount: number; candidatesTokenCount: number };
-        };
-        const text = payload.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("");
-        if (text) yield { type: "text", content: text };
-      } catch {
-        // skip
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || !trimmed.startsWith("data: ")) continue;
+        try {
+          const chunk = JSON.parse(trimmed.slice(6)) as {
+            candidates?: Array<{ content?: { parts?: Array<{ text?: string; thought?: boolean }> } }>;
+            usageMetadata?: { promptTokenCount: number; candidatesTokenCount: number };
+          };
+          for (const part of chunk.candidates?.[0]?.content?.parts ?? []) {
+            if (part.text) {
+              if (part.thought) {
+                yield { type: "text", content: `[思考] ${part.text}\n[/思考]\n` };
+              } else {
+                yield { type: "text", content: part.text };
+              }
+            }
+          }
+          if (chunk.usageMetadata) {
+            yield { type: "usage", usage: { prompt: chunk.usageMetadata.promptTokenCount, completion: chunk.usageMetadata.candidatesTokenCount } };
+          }
+        } catch { /* skip */ }
       }
     }
+  } finally {
+    reader.releaseLock();
   }
-
   yield { type: "done" };
 }
 
 // ─── Helpers ────────────────────────────────────────────────────
 
 function buildUrl(provider: ProviderConfig, path: string): string {
-  return `${provider.baseUrl.replace(/\/$/, "")}${path}`;
+  const base = provider.altBaseUrl || provider.baseUrl;
+  return `${base.replace(/\/$/, "")}${path}`;
 }
 
 function toModel(provider: ProviderConfig, id: string): ModelConfig {
@@ -572,29 +812,41 @@ export function inferCapabilities(provider: ProviderConfig, id: string): ModelCa
   const local = provider.type === "ollama";
   const isMimo = provider.type === "xiaomi-mimo";
   const isMimoTts = lower.includes("tts");
-  const isMimoOmni = lower.includes("omni") || lower === "mimo-v2.5" || lower === "mimo-v2-omni";
+
   return {
     chat: !embedding && !isMimoTts,
     completion: !embedding && !isMimoTts,
     embedding,
-    vision: lower.includes("vision") || lower.includes("gemini") || lower.includes("gpt-4") || isMimoOmni,
+    // Vision: GPT-4o/4v, Gemini, Qwen-VL, MiMo Omni
+    vision:
+      lower.includes("vision") || lower.includes("gpt-4o") || lower.includes("gpt-4.1") ||
+      lower.includes("gemini") || lower.includes("vl") ||
+      (isMimo && (lower.includes("omni") || lower === "mimo-v2.5")),
+    // Tool calling: most cloud providers support it
     toolCalling: !embedding && !local && !isMimoTts,
     jsonMode: !embedding && !isMimoTts,
+    // Reasoning models
     reasoning:
-      lower.includes("reason") ||
-      lower.includes("pro") ||
-      lower.includes("sonnet") ||
-      lower.includes("gpt") ||
-      lower.includes("o3") ||
-      lower.includes("k2") ||
-      lower.includes("qwen3") ||
-      (isMimo && (lower.includes("pro") || lower.includes("flash"))),
+      lower.includes("reason") ||           // DeepSeek Reasoner
+      lower.includes("o3") || lower.includes("o4") || lower.includes("o1") ||  // OpenAI o-series
+      lower.includes("sonnet-4") || lower.includes("opus-4") ||  // Claude extended thinking
+      lower.includes("2.5-pro") ||          // Gemini 2.5 Pro thinking
+      lower.includes("k2") ||               // Kimi K2
+      lower.includes("qwen3") ||            // Qwen3 thinking
+      (isMimo && lower.includes("pro")),
     local,
-    fast: lower.includes("mini") || lower.includes("flash") || lower.includes("haiku") || lower.includes("turbo") || (isMimo && lower.includes("flash")),
+    fast:
+      lower.includes("mini") || lower.includes("flash") || lower.includes("haiku") ||
+      lower.includes("turbo") || lower.includes("4.1-mini") ||
+      (isMimo && lower.includes("flash")),
     cheap:
-      lower.includes("mini") || lower.includes("flash") || lower.includes("haiku") || lower.includes("turbo") || local,
+      lower.includes("mini") || lower.includes("flash") || lower.includes("haiku") ||
+      lower.includes("turbo") || local,
     largeContext:
-      lower.includes("32k") || lower.includes("128k") || lower.includes("gemini") || lower.includes("sonnet") || lower.includes("k2") || (isMimo && (lower.includes("pro") || lower.includes("omni") || lower === "mimo-v2.5")),
+      lower.includes("32k") || lower.includes("64k") || lower.includes("128k") ||
+      lower.includes("gemini") || lower.includes("sonnet") || lower.includes("k2") ||
+      lower.includes("gpt-4.1") ||
+      (isMimo && (lower.includes("pro") || lower.includes("omni") || lower === "mimo-v2.5")),
   };
 }
 
@@ -635,59 +887,77 @@ export function getBestModelForTask(
 }
 
 
-// ─── MiMo TTS ──────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// ─── Independent TTS Provider System ────────────────────────────
+// ═══════════════════════════════════════════════════════════════
 
-export interface MiMoTTSRequest {
+export interface TTSRequest {
   text: string;
-  stylePrompt?: string;
+  ttsProvider: TTSProviderConfig;
   voice?: string;
+  model?: string;
   format?: "wav" | "mp3" | "pcm16";
   speed?: number;
-  model?: string;
-  provider: ProviderConfig;
+  stylePrompt?: string;
+  instructions?: string;  // OpenAI TTS
 }
 
-export async function callMiMoTTS(
-  req: MiMoTTSRequest,
+export async function callTTS(
+  req: TTSRequest,
   fetcher: typeof fetch = fetch
 ): Promise<{ audioBase64: string; format: string }> {
-  // Use altBaseUrl if set, otherwise default baseUrl
-  const baseUrl = req.provider.altBaseUrl || req.provider.baseUrl;
+  switch (req.ttsProvider.type) {
+    case "mimo-tts":
+      return callMiMoTTS(req, fetcher);
+    case "openai-tts":
+      return callOpenAITTS(req, fetcher);
+    case "fish-audio":
+      return callFishAudioTTS(req, fetcher);
+    case "edge-tts":
+      return callEdgeTTS(req, fetcher);
+    case "custom-tts":
+      return callCustomTTS(req, fetcher);
+    default:
+      throw new Error(`Unsupported TTS provider: ${req.ttsProvider.type}`);
+  }
+}
+
+// ─── MiMo TTS ──────────────────────────────────────────────────
+
+async function callMiMoTTS(
+  req: TTSRequest,
+  fetcher: typeof fetch
+): Promise<{ audioBase64: string; format: string }> {
+  const p = req.ttsProvider;
+  const baseUrl = p.mimoAltBaseUrl || p.baseUrl;
   const url = `${baseUrl.replace(/\/$/, "")}/chat/completions`;
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    "api-key": req.provider.apiKey,
-    "Authorization": `Bearer ${req.provider.apiKey}`,
-  };
 
   const messages: Array<{ role: string; content: string }> = [];
-
-  // style prompt goes in user message (per MiMo docs: natural language style instructions)
-  if (req.stylePrompt) {
-    messages.push({ role: "user", content: req.stylePrompt });
+  if (req.stylePrompt ?? p.defaultStylePrompt) {
+    messages.push({ role: "user", content: req.stylePrompt ?? p.defaultStylePrompt ?? "" });
   }
-
-  // text to synthesize goes in assistant message
   messages.push({ role: "assistant", content: req.text });
 
   const audioConfig: Record<string, unknown> = {
-    format: req.format ?? "wav",
-    voice: req.voice ?? "mimo_default",
+    format: req.format ?? p.defaultFormat ?? "wav",
+    voice: req.voice ?? p.defaultVoice ?? "mimo_default",
   };
-  // Pass speed if specified (0.5 - 2.0)
-  if (req.speed !== undefined && req.speed !== 1.0) {
-    audioConfig.speed = req.speed;
-  }
+  const spd = req.speed ?? p.defaultSpeed;
+  if (spd !== undefined && spd !== 1.0) audioConfig.speed = spd;
 
   const body = JSON.stringify({
-    model: req.model ?? "mimo-v2.5-tts",
+    model: req.model ?? p.defaultModel ?? "mimo-v2.5-tts",
     messages,
     audio: audioConfig,
   });
 
   const response = await fetcher(url, {
     method: "POST",
-    headers,
+    headers: {
+      "Content-Type": "application/json",
+      "api-key": p.apiKey,
+      "Authorization": `Bearer ${p.apiKey}`,
+    },
     body,
   });
 
@@ -703,5 +973,180 @@ export async function callMiMoTTS(
   const audioData = data.choices?.[0]?.message?.audio?.data;
   if (!audioData) throw new Error("No audio data in TTS response");
 
-  return { audioBase64: audioData, format: req.format ?? "wav" };
+  return { audioBase64: audioData, format: req.format ?? p.defaultFormat ?? "wav" };
+}
+
+// ─── OpenAI TTS ────────────────────────────────────────────────
+
+async function callOpenAITTS(
+  req: TTSRequest,
+  fetcher: typeof fetch
+): Promise<{ audioBase64: string; format: string }> {
+  const p = req.ttsProvider;
+  const url = `${p.baseUrl.replace(/\/$/, "")}/audio/speech`;
+
+  const bodyObj: Record<string, unknown> = {
+    model: req.model ?? p.defaultModel ?? "tts-1",
+    input: req.text,
+    voice: req.voice ?? p.defaultVoice ?? "alloy",
+    response_format: req.format === "pcm16" ? "pcm" : (req.format ?? p.defaultFormat ?? "mp3"),
+  };
+  if (req.speed ?? p.defaultSpeed) bodyObj.speed = req.speed ?? p.defaultSpeed;
+  if (req.instructions ?? p.openaiInstructions) bodyObj.instructions = req.instructions ?? p.openaiInstructions;
+
+  const response = await fetcher(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${p.apiKey}`,
+    },
+    body: JSON.stringify(bodyObj),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => "");
+    throw new Error(`OpenAI TTS error ${response.status}: ${errText.slice(0, 300)}`);
+  }
+
+  const arrayBuf = await response.arrayBuffer();
+  const bytes = new Uint8Array(arrayBuf);
+  let binary = "";
+  for (const b of bytes) binary += String.fromCharCode(b);
+  const audioBase64 = btoa(binary);
+
+  return { audioBase64, format: req.format ?? p.defaultFormat ?? "mp3" };
+}
+
+// ─── Fish Audio TTS ────────────────────────────────────────────
+
+async function callFishAudioTTS(
+  req: TTSRequest,
+  fetcher: typeof fetch
+): Promise<{ audioBase64: string; format: string }> {
+  const p = req.ttsProvider;
+  const url = `${p.baseUrl.replace(/\/$/, "")}/v1/tts`;
+
+  const bodyObj: Record<string, unknown> = {
+    text: req.text,
+    reference_id: req.voice ?? p.fishReferenceId ?? p.defaultVoice,
+    format: req.format === "pcm16" ? "wav" : (req.format ?? p.defaultFormat ?? "wav"),
+  };
+  if (req.speed ?? p.defaultSpeed) bodyObj.speed = req.speed ?? p.defaultSpeed;
+
+  const response = await fetcher(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${p.apiKey}`,
+    },
+    body: JSON.stringify(bodyObj),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => "");
+    throw new Error(`Fish Audio TTS error ${response.status}: ${errText.slice(0, 300)}`);
+  }
+
+  const arrayBuf = await response.arrayBuffer();
+  const bytes = new Uint8Array(arrayBuf);
+  let binary = "";
+  for (const b of bytes) binary += String.fromCharCode(b);
+  const audioBase64 = btoa(binary);
+
+  return { audioBase64, format: req.format ?? p.defaultFormat ?? "wav" };
+}
+
+// ─── Edge TTS (free, via WebSocket relay or REST proxy) ─────────
+
+async function callEdgeTTS(
+  req: TTSRequest,
+  fetcher: typeof fetch
+): Promise<{ audioBase64: string; format: string }> {
+  // Edge TTS typically requires a relay server (e.g., edge-tts npm package)
+  // This calls a self-hosted REST proxy
+  const p = req.ttsProvider;
+  const url = `${p.baseUrl.replace(/\/$/, "")}/tts`;
+
+  const bodyObj: Record<string, unknown> = {
+    text: req.text,
+    voice: req.voice ?? p.defaultVoice ?? "zh-CN-XiaoxiaoNeural",
+    rate: req.speed ? `${((req.speed - 1) * 100).toFixed(0)}%` : "+0%",
+    format: req.format ?? "mp3",
+  };
+
+  const response = await fetcher(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(bodyObj),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => "");
+    throw new Error(`Edge TTS error ${response.status}: ${errText.slice(0, 300)}`);
+  }
+
+  const arrayBuf = await response.arrayBuffer();
+  const bytes = new Uint8Array(arrayBuf);
+  let binary = "";
+  for (const b of bytes) binary += String.fromCharCode(b);
+  const audioBase64 = btoa(binary);
+
+  return { audioBase64, format: req.format ?? "mp3" };
+}
+
+// ─── Custom TTS ────────────────────────────────────────────────
+
+async function callCustomTTS(
+  req: TTSRequest,
+  fetcher: typeof fetch
+): Promise<{ audioBase64: string; format: string }> {
+  const p = req.ttsProvider;
+  const url = p.baseUrl.replace(/\/$/, "");
+
+  // Use request template if provided
+  let body: string;
+  if (p.requestTemplate) {
+    body = p.requestTemplate
+      .replace("{{text}}", req.text)
+      .replace("{{voice}}", req.voice ?? p.defaultVoice ?? "")
+      .replace("{{model}}", req.model ?? p.defaultModel ?? "")
+      .replace("{{speed}}", String(req.speed ?? p.defaultSpeed ?? 1.0))
+      .replace("{{format}}", req.format ?? p.defaultFormat ?? "wav");
+  } else {
+    body = JSON.stringify({
+      text: req.text,
+      voice: req.voice ?? p.defaultVoice,
+      model: req.model ?? p.defaultModel,
+      speed: req.speed ?? p.defaultSpeed,
+      format: req.format ?? p.defaultFormat ?? "wav",
+    });
+  }
+
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (p.apiKey) headers["Authorization"] = `Bearer ${p.apiKey}`;
+  if (p.customHeaders) Object.assign(headers, p.customHeaders);
+
+  const response = await fetcher(url, { method: "POST", headers, body });
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => "");
+    throw new Error(`Custom TTS error ${response.status}: ${errText.slice(0, 300)}`);
+  }
+
+  // Try to parse as JSON first (base64 response), fallback to binary
+  const contentType = response.headers.get("content-type") ?? "";
+  if (contentType.includes("json")) {
+    const data = await response.json() as Record<string, unknown>;
+    const audioBase64 = (data.audioBase64 ?? data.audio ?? data.data ?? "") as string;
+    if (!audioBase64) throw new Error("No audio data in custom TTS response");
+    return { audioBase64, format: (data.format as string) ?? req.format ?? "wav" };
+  }
+
+  const arrayBuf = await response.arrayBuffer();
+  const bytes = new Uint8Array(arrayBuf);
+  let binary = "";
+  for (const b of bytes) binary += String.fromCharCode(b);
+  const audioBase64 = btoa(binary);
+
+  return { audioBase64, format: req.format ?? "wav" };
 }

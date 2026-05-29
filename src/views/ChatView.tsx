@@ -19,9 +19,12 @@ export function ChatView() {
     syncProvidersToServer,
     branchConversation,
     skills,
+    updateTokenUsage,
+    tokenUsageByConv,
   } = store;
 
   const activeConversation = conversations.find((c) => c.id === activeConvId) ?? null;
+  const convTokenUsage = activeConvId ? (tokenUsageByConv[activeConvId] ?? { promptTokens: 0, completionTokens: 0, cachedTokens: 0, compressionSaved: 0 }) : null;
   const [chatInput, setChatInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
@@ -35,6 +38,7 @@ export function ChatView() {
   const [attachedFiles, setAttachedFiles] = useState<Array<{ name: string; type: string; size: number; content?: string; base64?: string }>>([]);
   const abortRef = useRef<AbortController | null>(null);
   const [expandedMsgs, setExpandedMsgs] = useState<Set<string>>(new Set());
+  const [expandedThinking, setExpandedThinking] = useState<Set<string>>(new Set());
   const [specifiedSkill, setSpecifiedSkill] = useState<string>("");
   const [showSkillPicker, setShowSkillPicker] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -165,11 +169,33 @@ export function ChatView() {
 
   const renderMessageContent = (content: string, msgId: string) => {
     const COLLAPSE_THRESHOLD = 800; // chars
-    const isLong = content.length > COLLAPSE_THRESHOLD;
+
+    // First, extract thinking blocks (<think>...</think>) and old format ([思考]...[/思考])
+    let processedContent = content;
+    // Normalize old [思考]...[/思考] format to <think>...</think>
+    processedContent = processedContent.replace(/\[思考\]([\s\S]*?)\[\/思考\]/g, '<think>$1</think>');
+
+    const thinkingParts = processedContent.split(/(<think>[\s\S]*?<\/think>)/g);
+    const thinkingBlocks: string[] = [];
+    const textParts: string[] = [];
+
+    for (const part of thinkingParts) {
+      const thinkMatch = part.match(/^<think>([\s\S]*?)<\/think>$/);
+      if (thinkMatch) {
+        thinkingBlocks.push(thinkMatch[1].trim());
+      } else if (part.trim()) {
+        textParts.push(part);
+      }
+    }
+
+    const thinkingText = thinkingBlocks.join("\n");
+    const mainContent = textParts.join("").trim();
+    const isLong = mainContent.length > COLLAPSE_THRESHOLD;
     const isExpanded = expandedMsgs.has(msgId);
+    const isThinkingExpanded = expandedThinking.has(msgId);
 
     // Parse code blocks: ```lang\ncode\n```
-    const parts = content.split(/(```[\s\S]*?```)/g);
+    const parts = mainContent.split(/(```[\s\S]*?```)/g);
     const rendered = parts.map((part, i) => {
       const codeMatch = part.match(/^```(\w*)\n?([\s\S]*?)```$/);
       if (codeMatch) {
@@ -204,15 +230,42 @@ export function ChatView() {
       );
     });
 
+    const thinkingPanel = thinkingText ? (
+      <div style={{ marginBottom: 8, borderRadius: 8, border: "1px solid var(--border)", overflow: "hidden" }}>
+        <button
+          onClick={() => setExpandedThinking((prev) => {
+            const n = new Set(prev);
+            if (n.has(msgId)) n.delete(msgId); else n.add(msgId);
+            return n;
+          })}
+          style={{
+            display: "flex", alignItems: "center", gap: 6, width: "100%",
+            padding: "8px 12px", background: "var(--bg)", border: "none", cursor: "pointer",
+            fontSize: 12, color: "var(--text-secondary)", fontWeight: 500,
+          }}
+        >
+          <span style={{ fontSize: 14 }}>{isThinkingExpanded ? "▼" : "▶"}</span>
+          <span>深度思考</span>
+          <span style={{ opacity: 0.5, fontSize: 11 }}>({thinkingText.length} 字)</span>
+        </button>
+        {isThinkingExpanded && (
+          <div style={{ padding: "8px 12px", whiteSpace: "pre-wrap", fontSize: 12, lineHeight: 1.6, color: "var(--text-secondary)", borderTop: "1px solid var(--border)", maxHeight: 400, overflow: "auto" }}>
+            {thinkingText}
+          </div>
+        )}
+      </div>
+    ) : null;
+
     if (isLong && !isExpanded) {
       return (
         <div>
+          {thinkingPanel}
           <div style={{ whiteSpace: "pre-wrap", maxHeight: 300, overflow: "hidden", position: "relative" }}>
             {rendered}
             <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 60, background: "linear-gradient(transparent, var(--bg-card))" }} />
           </div>
           <button className="icon-btn" onClick={() => setExpandedMsgs((prev) => new Set(prev).add(msgId))} style={{ fontSize: 12, color: "var(--primary)", marginTop: 4 }}>
-            <ChevronDown size={14} /> 展开全文 ({content.length} 字)
+            <ChevronDown size={14} /> 展开全文 ({mainContent.length} 字)
           </button>
         </div>
       );
@@ -220,6 +273,7 @@ export function ChatView() {
 
     return (
       <div>
+        {thinkingPanel}
         <div style={{ whiteSpace: "pre-wrap" }}>{rendered}</div>
         {isLong && isExpanded && (
           <button className="icon-btn" onClick={() => setExpandedMsgs((prev) => { const n = new Set(prev); n.delete(msgId); return n; })} style={{ fontSize: 12, color: "var(--primary)", marginTop: 4 }}>
@@ -244,7 +298,7 @@ export function ChatView() {
     try {
       const resp = await apiFetch("/api/tts", {
         method: "POST",
-        body: JSON.stringify({ text: text.slice(0, 2000), voice, stylePrompt: stylePrompt || undefined, speed, format: "wav", agentId }),
+        body: JSON.stringify({ text: text.slice(0, 2000), voice, stylePrompt: stylePrompt || undefined, speed, format: "wav", agentId, ttsProviderId: agentTTS?.ttsProviderId }),
       });
       if (resp.ok) {
         const data = await resp.json() as { audioBase64: string; format: string };
@@ -371,6 +425,15 @@ export function ChatView() {
                 fullContent += data.content;
                 setStreamingContent(fullContent);
                 if (data.agentName) setStreamingAgent({ id: data.agentId, name: data.agentName, color: data.agentColor, avatar: data.agentAvatar ?? "🤖" });
+              } else if (currentEvent === "usage" && data.usage) {
+                // Track token usage from server SSE
+                if (activeConvId) {
+                  updateTokenUsage(activeConvId, {
+                    prompt: data.usage.prompt ?? 0,
+                    completion: data.usage.completion ?? 0,
+                    cached: data.usage.cachedTokens ?? 0,
+                  });
+                }
               } else if (currentEvent === "error") throw new Error(data.error);
             } catch (e) { if (e instanceof SyntaxError) continue; throw e; }
           }
@@ -522,8 +585,8 @@ export function ChatView() {
                     ))}
                   </div>
                 )}
-                {renderMessageContent(msg.content.replace(/\[图片已附加\]\s*/g, "").replace(/\[文件:[^\]]+\]\s*/g, ""), msg.id)}
-                {msg.role === "assistant" && renderCitations(msg.content)}
+                {renderMessageContent(msg.content.replace(/\[图片已附加\]\s*/g, "").replace(/\[文件:[^\]]+\]\s*/g, "").replace(/<think>[\s\S]*?<\/think>/g, "").replace(/\[思考\][\s\S]*?\[\/思考\]/g, "").trim(), msg.id)}
+                {msg.role === "assistant" && renderCitations(msg.content.replace(/<think>[\s\S]*?<\/think>/g, "").replace(/\[思考\][\s\S]*?\[\/思考\]/g, ""))}
                 {msg.role === "assistant" && (
                   <div style={{ display: "flex", gap: 4, marginTop: 4, alignItems: "center" }}>
                     <button className="icon-btn" onClick={() => copyToClipboard(msg.content)} title="复制" style={{ fontSize: 11, padding: "2px 4px", display: "inline-flex", alignItems: "center" }}>
@@ -556,6 +619,11 @@ export function ChatView() {
                 )}
               </div>
               <div className="msg-time">{formatTime(msg.createdAt)}</div>
+                {msg.tokenUsage && (
+                  <div style={{ fontSize: 10, color: "var(--text-secondary)", opacity: 0.6, marginTop: 2 }}>
+                    ↑{msg.tokenUsage.prompt.toLocaleString()} ↓{msg.tokenUsage.completion.toLocaleString()} tokens
+                  </div>
+                )}
             </div>
           </div>
         ))}
@@ -565,7 +633,23 @@ export function ChatView() {
             <div>
               <div className="msg-bubble">
                 {streamingAgent && <div className="msg-agent-name" style={{ color: streamingAgent.color }}>{streamingAgent.avatar} {streamingAgent.name}<span className="streaming-dot" /></div>}
-                <div style={{ whiteSpace: "pre-wrap" }}>{streamingContent}<span className="streaming-dot" /></div>
+                {(() => {
+                  // Extract thinking from streaming content
+                  const thinkMatch = streamingContent.match(/^(<think>[\s\S]*?<\/think>)([\s\S]*)$/s);
+                  if (thinkMatch) {
+                    const thinkText = thinkMatch[1].replace(/<think>|<\/think>/g, "").trim();
+                    const mainText = thinkMatch[2].trim();
+                    return (
+                      <>
+                        <div style={{ marginBottom: 6, padding: "6px 10px", borderRadius: 6, background: "var(--bg)", border: "1px solid var(--border)", fontSize: 11, color: "var(--text-secondary)" }}>
+                          <span style={{ marginRight: 4 }}>🧠</span>深度思考中... ({thinkText.length} 字)
+                        </div>
+                        <div style={{ whiteSpace: "pre-wrap" }}>{mainText}<span className="streaming-dot" /></div>
+                      </>
+                    );
+                  }
+                  return <div style={{ whiteSpace: "pre-wrap" }}>{streamingContent}<span className="streaming-dot" /></div>;
+                })()}
               </div>
             </div>
           </div>

@@ -43,7 +43,7 @@ describe("callChatCompletion", () => {
       }
     );
     expect(result.content).toBe("Hi there!");
-    expect(result.usage).toEqual({ prompt: 10, completion: 5 });
+    expect(result.usage).toMatchObject({ prompt: 10, completion: 5 });
   });
 
   it("calls Anthropic API with correct format", async () => {
@@ -60,7 +60,7 @@ describe("callChatCompletion", () => {
         expect(String(url)).toBe("https://api.anthropic.com/messages");
         const body = JSON.parse(options?.body as string);
         expect(body.model).toBe("claude-sonnet-4-20250514");
-        expect(body.system).toBe("You are helpful.");
+        expect(Array.isArray(body.system) ? body.system[0].text : body.system).toBe("You are helpful.");
         expect(body.messages[0].role).toBe("user");
         return new Response(JSON.stringify({
           content: [{ text: "Hello! How can I help?" }],
@@ -69,7 +69,7 @@ describe("callChatCompletion", () => {
       }
     );
     expect(result.content).toBe("Hello! How can I help?");
-    expect(result.usage).toEqual({ prompt: 15, completion: 8 });
+    expect(result.usage).toMatchObject({ prompt: 15, completion: 8 });
   });
 
   it("throws on API error", async () => {

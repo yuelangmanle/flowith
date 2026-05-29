@@ -10,6 +10,7 @@ import type {
 } from "./types";
 import { getAgentById, getAgentsForProjectGeneration, getAgentsForRoundtable } from "./agentConfig";
 import { streamChatCompletion } from "./modelGateway";
+import { buildContextMessages } from "./contextManager";
 
 // ─── Orchestration Plan ─────────────────────────────────────────
 
@@ -247,38 +248,17 @@ export async function* streamAgentMessage(
   specifiedSkill?: string
 ): AsyncGenerator<StreamChunk> {
   const agent = getAgentById(agentId);
-  const isFreeChat = !agentId || agentId === "none" || !agent;
+  const systemPrompt = agent?.systemPrompt ?? "你是一个有用的 AI 助手。请用中文回答用户的问题，保持简洁专业。";
 
-  const messages: Array<{ role: string; content: string }> = [];
-
-  // Build system prompt with skills awareness
-  let systemPrompt = agent?.systemPrompt ?? "你是一个有用的 AI 助手。请用中文回答用户的问题，保持简洁专业。";
-
-  if (installedSkills && installedSkills.length > 0) {
-    const skillsContext = installedSkills.slice(0, 15).map((s) => {
-      const caps = s.capabilities ? ` [${s.capabilities.slice(0, 3).join(", ")}]` : "";
-      return `- ${s.nameZh}: ${s.descriptionZh.slice(0, 100)}${caps}`;
-    }).join("\n");
-
-    if (specifiedSkill) {
-      systemPrompt += `\n\n【指定技能】用户要求你使用 "${specifiedSkill}" 技能来完成任务。请优先参考该技能的方法论和最佳实践。`;
-    }
-
-    systemPrompt += `\n\n【可用技能】你当前已安装以下技能，在合适的时候可以参考和运用它们的方法论，但不要生搬硬套：\n${skillsContext}\n\n使用原则：\n1. 当任务明显匹配某个技能的使用场景时，自然地运用该技能的方法\n2. 不需要每次都提及技能名称，只需按技能的方法论行事\n3. 如果没有合适的技能，按你自己的专业判断处理\n4. 用户明确指定技能时，优先使用该技能`;
-  }
-
-  if (systemPrompt) {
-    messages.push({ role: "system", content: systemPrompt });
-  }
-
-  for (const msg of conversation.messages.slice(-30)) {
-    messages.push({
-      role: msg.role === "assistant" ? "assistant" : "user",
-      content: msg.agentName ? `[${msg.agentName}]: ${msg.content}` : msg.content,
-    });
-  }
-
-  messages.push({ role: "user", content: userMessage });
+  // Use context manager for token-aware context building with compression
+  const contextResult = buildContextMessages({
+    messages: conversation.messages,
+    systemPrompt,
+    model: modelId,
+    installedSkills,
+    specifiedSkill,
+    userQuery: userMessage,
+  });
 
   yield {
     type: "text",
@@ -289,7 +269,7 @@ export async function* streamAgentMessage(
     agentAvatar: agent?.avatar ?? "🤖",
   };
 
-  yield* streamChatCompletion({ provider, model: modelId, messages, stream: true });
+  yield* streamChatCompletion({ provider, model: modelId, messages: contextResult.messages, stream: true });
 }
 
 // ─── Project Generation (legacy) ────────────────────────────────

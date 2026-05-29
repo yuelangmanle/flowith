@@ -13,8 +13,9 @@ import { CodeGenView } from "./views/CodeGenView";
 import { ProjectsView } from "./views/ProjectsView";
 import { RightPanel } from "./views/RightPanel";
 import { SkillsView } from "./views/SkillsView";
-import type { AgentTTSConfig, ModelConfig, Skill } from "./core/types";
+import type { AgentTTSConfig, ModelConfig, Skill, TTSProviderConfig } from "./core/types";
 import { useKeyboard } from "./lib/useKeyboard";
+import { SetupWizard } from "./views/SetupWizard";
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: string }> {
   state = { hasError: false, error: "" };
@@ -38,7 +39,7 @@ export function App() {
   const {
     view, setView, sidebarOpen, toggleSidebar, rightPanelOpen, toggleRightPanel,
     providers, setProviders, models, setModels, conversations,
-    agents, setAgents, setAgentModelConfigs, setAgentTTSConfigs, setSkills,
+    agents, setAgents, setAgentModelConfigs, setAgentTTSConfigs, setTTSProviders, setSkills,
     setSelectedAgentId,
     setServerConnected, serverConnected, createConversation, deleteConversation, pinConversation,
     toast, darkMode, toggleDarkMode,
@@ -46,6 +47,7 @@ export function App() {
 
   useKeyboard();
 
+  const [setupDone, setSetupDone] = useState(() => localStorage.getItem("flowith-setup-done") === "true");
   const [convSearch, setConvSearch] = useState("");
 
   const exportConversation = (conv: typeof conversations[0]) => {
@@ -95,6 +97,12 @@ export function App() {
       } catch {}
 
       try {
+        // TTS Providers
+        const tpResp = await apiFetch("/api/tts-providers");
+        if (tpResp.ok) { const d = await tpResp.json() as TTSProviderConfig[]; if (Array.isArray(d) && d.length > 0) setTTSProviders(d); }
+      } catch {}
+
+      try {
         // Skills
         const sResp = await apiFetch("/api/skills");
         if (sResp.ok) { const d = await sResp.json() as Skill[]; if (Array.isArray(d)) setSkills(d); }
@@ -135,6 +143,8 @@ export function App() {
     return () => clearInterval(interval);
   }, []); // eslint-disable-line
 
+  if (!setupDone) return <SetupWizard onComplete={() => setSetupDone(true)} />;
+
   return (
     <ErrorBoundary>
       <div className="app-shell" data-theme={darkMode ? "dark" : "light"}>
@@ -144,8 +154,8 @@ export function App() {
               {sidebarOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
             </button>
             <div className="topbar-title">
-              <div className="logo">M</div>
-              Multi-Agent Workspace
+              <div className="logo">F</div>
+              Flowith
             </div>
           </div>
           <div className="topbar-right">

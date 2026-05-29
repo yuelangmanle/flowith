@@ -6,7 +6,8 @@ import {
   discoverModels,
   streamChatCompletion,
   getFallbackModels,
-  callMiMoTTS,
+  createDefaultTTSProviders,
+  callTTS,
 } from "../core/modelGateway";
 import { DEFAULT_AGENTS, createUserAgent, getAgentById } from "../core/agentConfig";
 import {
@@ -26,10 +27,9 @@ import type {
   Conversation,
   ChatMessage,
   ProviderConfig,
-  
+  TTSProviderConfig,
   VoteSession,
   CodeGenRun,
-  
   AgentConfig,
 } from "../core/types";
 import type { RoundtableState } from "../core/roundtable";
@@ -37,8 +37,10 @@ import type { MemoryStore } from "../core/memoryKnowledge";
 
 // ─── Paths ──────────────────────────────────────────────────────
 
-const workspaceRoot = resolve(process.cwd(), ".agent-workspaces");
-const dataDir = resolve(process.cwd(), ".agent-data");
+// Support custom data directory (for Tauri packaged mode)
+const baseDir = process.env.AGENT_DATA_DIR || process.cwd();
+const workspaceRoot = resolve(baseDir, ".agent-workspaces");
+const dataDir = resolve(baseDir, ".agent-data");
 const providersFile = resolve(dataDir, "providers.json");
 const conversationsFile = resolve(dataDir, "conversations.json");
 const agentsFile = resolve(dataDir, "agents.json");
@@ -52,12 +54,14 @@ const skillsFile = resolve(dataDir, "skills.json");
 let providers: ProviderConfig[] = createDefaultProviders();
 let agents: AgentConfig[] = [...DEFAULT_AGENTS];
 let agentModelConfigs: Array<{ agentId: string; providerId: string; modelId: string; useGlobal?: boolean }> = [];
-let agentTTSConfigs: Array<{ agentId: string; enabled: boolean; voice?: string; speed?: number; stylePrompt?: string; model?: string; autoSpeak?: boolean }> = [];
+let agentTTSConfigs: Array<{ agentId: string; enabled: boolean; ttsProviderId?: string; voice?: string; speed?: number; stylePrompt?: string; model?: string; autoSpeak?: boolean }> = [];
 const conversations = new Map<string, Conversation>();
 const roundtables = new Map<string, RoundtableState>();
 const votes = new Map<string, VoteSession>();
 const codeGenRuns = new Map<string, CodeGenRun>();
 const memory: MemoryStore = createMemoryStore();
+const ttsProvidersFile = resolve(dataDir, "tts-providers.json");
+let ttsProviders: TTSProviderConfig[] = createDefaultTTSProviders();
 interface InstalledSkill { id: string; name: string; nameZh?: string; description: string; descriptionZh?: string; installed: boolean; capabilities?: string[]; repo?: string; source?: string; stars?: number; [key: string]: unknown; }
 let installedSkills: InstalledSkill[] = [];
 
@@ -101,6 +105,28 @@ async function loadFromDisk() {
     const saved = JSON.parse(raw);
     if (Array.isArray(saved)) installedSkills = saved;
   } catch { /* no skills saved yet */ }
+}
+
+async function loadTTSProvidersFromDisk() {
+  try {
+    const raw = await readFile(ttsProvidersFile, "utf8");
+    const saved = JSON.parse(raw) as TTSProviderConfig[];
+    if (Array.isArray(saved) && saved.length > 0) {
+      const defaults = createDefaultTTSProviders();
+      const merged = [...saved];
+      for (const def of defaults) {
+        if (!merged.find((p) => p.id === def.id)) merged.push(def);
+      }
+      ttsProviders = merged;
+    }
+  } catch { /* use defaults */ }
+}
+
+async function saveTTSProvidersToDisk() {
+  try {
+    await ensureDataDir();
+    await fsWriteFile(ttsProvidersFile, JSON.stringify(ttsProviders, null, 2), "utf8");
+  } catch { /* silently fail */ }
 }
 
 async function saveProvidersToDisk() {
@@ -189,6 +215,16 @@ export async function createServer() {
   await mkdir(workspaceRoot, { recursive: true });
   await ensureDataDir();
   await loadFromDisk();
+  await loadTTSProvidersFromDisk();
+
+  // Auto-sync MiMo TTS API key from model provider if empty
+  const mimoProvider = providers.find((p) => p.type === "xiaomi-mimo");
+  const mimoTTS = ttsProviders.find((p) => p.type === "mimo-tts");
+  if (mimoProvider && mimoTTS && !mimoTTS.apiKey && mimoProvider.apiKey) {
+    mimoTTS.apiKey = mimoProvider.apiKey;
+    if (mimoProvider.altBaseUrl) mimoTTS.mimoAltBaseUrl = mimoProvider.altBaseUrl;
+    await saveTTSProvidersToDisk();
+  }
 
   return http.createServer(async (request, response) => {
     try {
@@ -367,6 +403,8 @@ export async function createServer() {
             if (chunk.type === "text" && chunk.content) {
               fullContent += chunk.content;
               sendSSE(response, "text", chunk);
+            } else if (chunk.type === "usage") {
+              sendSSE(response, "usage", { usage: chunk.usage });
             } else if (chunk.type === "done") {
               clearTimeout(timeout);
               const agent = getAgentById(agentId);
@@ -783,7 +821,20 @@ export async function createServer() {
         return send(response, 200, { ok: true });
       }
 
-      // ─── TTS (MiMo) ───────────────────────────────────
+      // ─── TTS Providers CRUD ────────────────────────────
+      if (request.method === "GET" && path === "/api/tts-providers") {
+        return send(response, 200, ttsProviders);
+      }
+      if (request.method === "PUT" && path === "/api/tts-providers") {
+        const body = await readJson(request) as { providers: TTSProviderConfig[] };
+        if (body.providers) {
+          ttsProviders = body.providers;
+          await saveTTSProvidersToDisk();
+        }
+        return send(response, 200, { ok: true });
+      }
+
+      // ─── TTS (Generic) ──────────────────────────────────
       if (request.method === "POST" && path === "/api/tts") {
         const body = await readJson(request) as {
           text: string;
@@ -791,27 +842,30 @@ export async function createServer() {
           voice?: string;
           format?: string;
           speed?: number;
-          providerId?: string;
+          ttsProviderId?: string;
           model?: string;
           agentId?: string;
+          instructions?: string;
         };
 
-        const provider = providers.find((p) => p.id === body.providerId) ??
-          providers.find((p) => p.type === "xiaomi-mimo" && p.enabled && p.apiKey);
-        if (!provider) return send(response, 400, { error: "No MiMo provider configured with API key" });
-
-        // Merge per-agent TTS config if agentId provided
+        // Find TTS provider: explicit ID > per-agent config > first enabled
         const agentTTS = body.agentId ? agentTTSConfigs.find((c) => c.agentId === body.agentId) : undefined;
+        const providerId = body.ttsProviderId ?? agentTTS?.ttsProviderId;
+        const ttsProvider = (providerId ? ttsProviders.find((p) => p.id === providerId) : null) ??
+          ttsProviders.find((p) => p.enabled && p.apiKey) ??
+          ttsProviders.find((p) => p.enabled);  // Edge TTS doesn't need API key
+        if (!ttsProvider) return send(response, 400, { error: "No TTS provider configured. Please set up a TTS provider in Settings." });
 
         try {
-          const result = await callMiMoTTS({
+          const result = await callTTS({
             text: body.text,
-            stylePrompt: body.stylePrompt ?? agentTTS?.stylePrompt ?? provider.ttsStylePrompt,
-            voice: body.voice ?? agentTTS?.voice ?? provider.ttsVoice ?? "mimo_default",
-            format: (body.format ?? provider.ttsFormat ?? "wav") as "wav" | "mp3" | "pcm16",
-            speed: body.speed ?? agentTTS?.speed ?? provider.ttsSpeed,
-            model: body.model ?? agentTTS?.model ?? provider.ttsModel ?? "mimo-v2.5-tts",
-            provider,
+            ttsProvider,
+            voice: body.voice ?? agentTTS?.voice,
+            model: body.model ?? agentTTS?.model,
+            format: (body.format ?? "wav") as "wav" | "mp3" | "pcm16",
+            speed: body.speed ?? agentTTS?.speed,
+            stylePrompt: body.stylePrompt ?? agentTTS?.stylePrompt,
+            instructions: body.instructions,
           });
           return send(response, 200, result);
         } catch (err) {

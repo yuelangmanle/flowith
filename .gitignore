@@ -1,9 +1,28 @@
-.superpowers/
+# Dependencies
 node_modules/
+
+# Build outputs
 dist/
+.superpowers/
+
+# Runtime data
 .agent-workspaces/
-.DS_Store
+.agent-data/
+
+# Build artifacts
 *.tsbuildinfo
 vite.config.js
 vite.config.d.ts
-.agent-data/
+
+# Tauri
+src-tauri/target/
+src-tauri/binaries/server.mjs
+.sidecar-build/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local

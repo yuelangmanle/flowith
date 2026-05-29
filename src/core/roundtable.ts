@@ -12,6 +12,8 @@ import type {
 } from "./types";
 import { getAgentById } from "./agentConfig";
 import { streamChatCompletion } from "./modelGateway";
+import { buildContextMessages } from "./contextManager";
+import { estimateTokens } from "./tokenCounter";
 
 // ─── Roundtable State ───────────────────────────────────────────
 
@@ -56,14 +58,25 @@ export function createRoundtable(
 function buildDiscussionPrompt(
   state: RoundtableState,
   agent: AgentConfig,
-  round: number
+  round: number,
+  model: string = "gpt-4o"
 ): string {
-  const recentMessages = state.conversation.messages.slice(-20);
-  const history = recentMessages
-    .map((m) => `[${m.agentName ?? "用户"}]: ${m.content.slice(0, 300)}`)
+  // Use token-aware context building instead of fixed slice(0, 300)
+  const contextResult = buildContextMessages({
+    messages: state.conversation.messages,
+    systemPrompt: "",
+    model, // use actual model for accurate context window calculation
+    maxOutputTokens: 2048,
+  });
+
+  // Extract the history portion (skip system message if any)
+  const historyMsgs = contextResult.messages.filter((m) => m.role !== "system");
+  const history = historyMsgs
+    .slice(-10) // Keep last 10 for discussion prompt readability
+    .map((m) => m.content)
     .join("\n\n");
 
-  if (round === 0 && recentMessages.length === 0) {
+  if (round === 0 && !history) {
     return `讨论主题：${state.topic}\n\n请从你的专业角度（${agent.name}，${agent.goal}）发表看法。保持简洁，2-3 段。如果有不同意见请直接指出。`;
   }
 
@@ -81,7 +94,7 @@ export async function* runRoundtableDiscussion(
     state.currentRound = round;
 
     for (const agent of state.agents) {
-      const prompt = buildDiscussionPrompt(state, agent, round);
+      const prompt = buildDiscussionPrompt(state, agent, round, model);
       const messages: Array<{ role: string; content: string }> = [];
 
       if (agent.systemPrompt) {
@@ -229,7 +242,11 @@ export function getVoteResults(session: VoteSession): {
 export function generateReport(state: RoundtableState): StructuredReport {
   const agentSections: ReportSection[] = state.agents.map((agent) => {
     const agentMessages = state.conversation.messages.filter((m) => m.agentId === agent.id);
-    const summary = agentMessages.map((m) => m.content.slice(0, 200)).join("\n---\n");
+    // Use token-aware truncation: keep more content for recent messages
+    const summary = agentMessages.map((m, i) => {
+      const maxLen = i >= agentMessages.length - 3 ? 300 : 150;
+      return m.content.slice(0, maxLen);
+    }).join("\n---\n");
     return {
       title: `${agent.avatar} ${agent.name} 观点`,
       content: summary || "未发言",
@@ -248,7 +265,7 @@ export function generateReport(state: RoundtableState): StructuredReport {
     });
 
   const allMessages = state.conversation.messages;
-  const lastMessages = allMessages.slice(-3).map((m) => m.content.slice(0, 100));
+  const lastMessages = allMessages.slice(-3).map((m) => { const tokens = estimateTokens(m.content); return tokens > 200 ? m.content.slice(0, 200) + "..." : m.content; });
   const conclusion = lastMessages.length > 0
     ? `讨论共 ${state.currentRound + 1} 轮，${allMessages.length} 条发言。最后发言摘要：${lastMessages.join(" | ")}`
     : "尚未完成讨论";

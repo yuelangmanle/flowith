@@ -5,7 +5,7 @@ import { apiFetch, getProviderIcon } from "../lib/shared";
 import type { AgentConfig, AgentTTSConfig } from "../core/types";
 
 export function AgentsView() {
-  const { agents, setAgents, providers, models, selectedProviderId, selectedModelId, agentModelConfigs, setAgentModelConfigs, agentTTSConfigs, setAgentTTSConfigs, ttsPlaying, showToast } = useStore();
+  const { agents, setAgents, providers, models, selectedProviderId, selectedModelId, agentModelConfigs, setAgentModelConfigs, agentTTSConfigs, setAgentTTSConfigs, ttsProviders, ttsPlaying, showToast } = useStore();
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
   const [newRole, setNewRole] = useState<AgentConfig["role"]>("coder");
@@ -21,7 +21,7 @@ export function AgentsView() {
     if (!ttsEnabledGlobal && !agentTTS?.enabled) return;
     setTtsPlaying(true);
     try {
-      const resp = await apiFetch("/api/tts", { method: "POST", body: JSON.stringify({ text: text.slice(0, 2000), voice: agentTTS?.voice ?? "mimo_default", stylePrompt: agentTTS?.stylePrompt, speed: agentTTS?.speed, format: "wav", agentId }) });
+      const resp = await apiFetch("/api/tts", { method: "POST", body: JSON.stringify({ text: text.slice(0, 2000), voice: agentTTS?.voice, stylePrompt: agentTTS?.stylePrompt, speed: agentTTS?.speed, format: "wav", agentId, ttsProviderId: agentTTS?.ttsProviderId }) });
       if (resp.ok) {
         const data = await resp.json() as { audioBase64: string; format: string };
         const bytes = Uint8Array.from(atob(data.audioBase64), (c) => c.charCodeAt(0));
@@ -105,7 +105,7 @@ export function AgentsView() {
                   <span style={{ fontSize: 11, color: "var(--text-muted)" }}>语音设置</span>
                   <button className={`toggle-switch ${agentTTSConfigs.find((c) => c.agentId === a.id)?.enabled ? "on" : ""}`} onClick={() => {
                     const existing = agentTTSConfigs.find((c) => c.agentId === a.id);
-                    const nc: AgentTTSConfig = { agentId: a.id, enabled: !existing?.enabled, voice: existing?.voice ?? "mimo_default", speed: existing?.speed, stylePrompt: existing?.stylePrompt, autoSpeak: existing?.autoSpeak };
+                    const nc: AgentTTSConfig = { agentId: a.id, enabled: !existing?.enabled, ttsProviderId: existing?.ttsProviderId, voice: existing?.voice, speed: existing?.speed, stylePrompt: existing?.stylePrompt, autoSpeak: existing?.autoSpeak };
                     const ncs = [...agentTTSConfigs.filter((c) => c.agentId !== a.id), nc];
                     setAgentTTSConfigs(ncs);
                     apiFetch("/api/agent-tts-configs", { method: "PUT", body: JSON.stringify({ configs: ncs }) });

@@ -1,9 +1,9 @@
 import { create } from "zustand";
-import { createDefaultProviders, getFallbackModels } from "../core/modelGateway";
+import { createDefaultProviders, createDefaultTTSProviders, getFallbackModels } from "../core/modelGateway";
 import { loadProviders, saveProviders, loadConversations, saveConversation, deleteConversation as deleteConv } from "../core/persistence";
 import { DEFAULT_AGENTS } from "../core/agentConfig";
 import { apiFetch, uid } from "./shared";
-import type { AgentConfig, AgentTTSConfig, ChatMessage, Conversation, ModelConfig, ProviderConfig, Skill } from "../core/types";
+import type { AgentConfig, AgentTTSConfig, ChatMessage, Conversation, ModelConfig, ProviderConfig, TTSProviderConfig, Skill } from "../core/types";
 
 // ─── Types ─────────────────────────────────────────────────────
 
@@ -62,6 +62,11 @@ interface AppState {
   selectedModelId: string;
   setSelectedModelId: (id: string) => void;
 
+  // TTS Providers
+  ttsProviders: TTSProviderConfig[];
+  setTTSProviders: (p: TTSProviderConfig[] | ((prev: TTSProviderConfig[]) => TTSProviderConfig[])) => void;
+  syncTTSProvidersToServer: () => void;
+
   // TTS
   ttsEnabled: boolean;
   setTtsEnabled: (v: boolean) => void;
@@ -95,6 +100,11 @@ interface AppState {
   installSkill: (skill: Skill) => void;
   uninstallSkill: (id: string) => void;
   getInstalledSkills: () => Skill[];
+
+  // Token Usage Tracking
+  tokenUsageByConv: Record<string, { promptTokens: number; completionTokens: number; cachedTokens: number; compressionSaved: number }>;
+  updateTokenUsage: (convId: string, usage: { prompt?: number; completion?: number; cached?: number; compressionSaved?: number }) => void;
+  getConvTokenUsage: (convId: string) => { promptTokens: number; completionTokens: number; cachedTokens: number; compressionSaved: number };
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -137,6 +147,14 @@ export const useStore = create<AppState>((set, get) => ({
   setSelectedProviderId: (id) => set({ selectedProviderId: id }),
   selectedModelId: "",
   setSelectedModelId: (id) => set({ selectedModelId: id }),
+
+  // TTS Providers
+  ttsProviders: createDefaultTTSProviders(),
+  setTTSProviders: (p) => set({ ttsProviders: typeof p === "function" ? p(get().ttsProviders) : p }),
+  syncTTSProvidersToServer: () => {
+    const p = get().ttsProviders;
+    try { apiFetch("/api/tts-providers", { method: "PUT", body: JSON.stringify({ providers: p }) }); } catch {}
+  },
 
   // TTS
   ttsEnabled: false,
@@ -265,4 +283,26 @@ export const useStore = create<AppState>((set, get) => ({
     });
   },
   getInstalledSkills: () => get().skills.filter((s) => s.installed),
+
+  // Token Usage Tracking
+  tokenUsageByConv: {},
+  updateTokenUsage: (convId, usage) => {
+    set((prev) => {
+      const existing = prev.tokenUsageByConv[convId] ?? { promptTokens: 0, completionTokens: 0, cachedTokens: 0, compressionSaved: 0 };
+      return {
+        tokenUsageByConv: {
+          ...prev.tokenUsageByConv,
+          [convId]: {
+            promptTokens: existing.promptTokens + (usage.prompt ?? 0),
+            completionTokens: existing.completionTokens + (usage.completion ?? 0),
+            cachedTokens: existing.cachedTokens + (usage.cached ?? 0),
+            compressionSaved: existing.compressionSaved + (usage.compressionSaved ?? 0),
+          },
+        },
+      };
+    });
+  },
+  getConvTokenUsage: (convId) => {
+    return get().tokenUsageByConv[convId] ?? { promptTokens: 0, completionTokens: 0, cachedTokens: 0, compressionSaved: 0 };
+  },
 }));

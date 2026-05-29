@@ -5,10 +5,15 @@ import { App } from "./App";
 const mockFetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ ok: true }), { status: 200 }));
 vi.stubGlobal("fetch", mockFetch);
 
+// Skip setup wizard in tests
+beforeEach(() => {
+  localStorage.setItem("flowith-setup-done", "true");
+});
+
 describe("App", () => {
   it("renders the multi-agent workspace shell", () => {
     render(<App />);
-    expect(screen.getAllByText(/Multi-Agent Workspace/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Flowith/).length).toBeGreaterThan(0);
   });
 
   it("shows the status pills with agent count", () => {
