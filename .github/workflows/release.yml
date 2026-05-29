@@ -64,6 +64,9 @@ jobs:
 
   build-android:
     runs-on: ubuntu-latest
+    env:
+      # Force Java 21 for Gradle
+      JAVA_HOME: ''
 
     steps:
       - uses: actions/checkout@v4
@@ -74,6 +77,7 @@ jobs:
           node-version: 20
 
       - name: Setup Java 21
+        id: java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
@@ -88,6 +92,12 @@ jobs:
 
       - name: Accept Android SDK licenses
         run: yes | sdkmanager --licenses || true
+
+      - name: Verify Java version
+        run: |
+          echo "JAVA_HOME=$JAVA_HOME"
+          java -version
+          $JAVA_HOME/bin/java -version
 
       - name: Install and build frontend
         run: |
@@ -109,8 +119,9 @@ jobs:
 
       - name: Build and upload Android APK
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          JAVA_HOME: ${{ steps.java.outputs.path }}
         run: |
+          echo "JAVA_HOME=$JAVA_HOME"
           cd android
           ./gradlew assembleDebug --no-daemon -Dorg.gradle.java.home="$JAVA_HOME"
           echo "=== Build outputs ==="
@@ -152,22 +163,10 @@ jobs:
             "notes": "Flowith $TAG",
             "pub_date": "$PUB_DATE",
             "platforms": {
-              "darwin-aarch64": {
-                "signature": "",
-                "url": "https://github.com/${{ github.repository }}/releases/download/$TAG/Flowith_${TAG}_aarch64.app.tar.gz"
-              },
-              "darwin-x86_64": {
-                "signature": "",
-                "url": "https://github.com/${{ github.repository }}/releases/download/$TAG/Flowith_${TAG}_x64.app.tar.gz"
-              },
-              "windows-x86_64": {
-                "signature": "",
-                "url": "https://github.com/${{ github.repository }}/releases/download/$TAG/Flowith_${TAG}_x64-setup.nsis.zip"
-              },
-              "android": {
-                "signature": "",
-                "url": "https://github.com/${{ github.repository }}/releases/download/$TAG/Flowith_${VERSION}_android.apk"
-              }
+              "darwin-aarch64": { "signature": "", "url": "https://github.com/${{ github.repository }}/releases/download/$TAG/Flowith_${TAG}_aarch64.app.tar.gz" },
+              "darwin-x86_64": { "signature": "", "url": "https://github.com/${{ github.repository }}/releases/download/$TAG/Flowith_${TAG}_x64.app.tar.gz" },
+              "windows-x86_64": { "signature": "", "url": "https://github.com/${{ github.repository }}/releases/download/$TAG/Flowith_${TAG}_x64-setup.nsis.zip" },
+              "android": { "signature": "", "url": "https://github.com/${{ github.repository }}/releases/download/$TAG/Flowith_${VERSION}_android.apk" }
             }
           }
           EOF
