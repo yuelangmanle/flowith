@@ -7,7 +7,7 @@ import { saveProviders } from "../core/persistence";
 import type { ModelConfig, ProviderConfig, TTSProviderConfig } from "../core/types";
 
 // App version
-const APP_VERSION = "1.3.2";
+const APP_VERSION = "1.3.3";
 function detectPlatform(): "mac" | "win" | "android" {
   if ((window as any).Capacitor) return "android";
   const ua = navigator.userAgent.toLowerCase();
