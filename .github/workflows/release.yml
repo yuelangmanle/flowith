@@ -64,9 +64,6 @@ jobs:
 
   build-android:
     runs-on: ubuntu-latest
-    env:
-      # Force Java 21 for Gradle
-      JAVA_HOME: ''
 
     steps:
       - uses: actions/checkout@v4
@@ -93,49 +90,45 @@ jobs:
       - name: Accept Android SDK licenses
         run: yes | sdkmanager --licenses || true
 
-      - name: Verify Java version
-        run: |
-          echo "JAVA_HOME=$JAVA_HOME"
-          java -version
-          $JAVA_HOME/bin/java -version
-
-      - name: Install and build frontend
+      - name: Install dependencies and build frontend
         run: |
           npm ci
           npx vite build
 
-      - name: Prepare Android web assets
+      - name: Sync Capacitor
         run: |
-          mkdir -p android/app/src/main/assets/public
-          cp -r dist/* android/app/src/main/assets/public/
-          cp capacitor.config.json android/app/src/main/assets/capacitor.config.json
+          npx cap copy android
+          npx cap update android
 
       - name: Configure Android SDK path
-        run: |
-          echo "sdk.dir=$ANDROID_HOME" > android/local.properties
+        run: echo "sdk.dir=$ANDROID_HOME" > android/local.properties
 
       - name: Make Gradlew executable
         run: chmod +x android/gradlew
 
-      - name: Build and upload Android APK
+      - name: Build Android APK
+        working-directory: android
         env:
           JAVA_HOME: ${{ steps.java.outputs.path }}
         run: |
-          echo "JAVA_HOME=$JAVA_HOME"
-          cd android
           ./gradlew assembleDebug --no-daemon -Dorg.gradle.java.home="$JAVA_HOME"
           echo "=== Build outputs ==="
           find app/build/outputs -type f -name "*.apk"
-          APK=$(find app/build/outputs -name "*.apk" | head -1)
-          if [ -z "$APK" ]; then
-            echo "ERROR: No APK produced!"
-            exit 1
-          fi
+
+      - name: Prepare and upload APK
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
           TAG="${{ github.ref_name }}"
           VERSION="${TAG#v}"
-          FINAL_NAME="Flowith_${VERSION}_android.apk"
-          cp "$APK" "../$FINAL_NAME"
-          echo "APK ready: $FINAL_NAME ($(ls -lh "../$FINAL_NAME" | awk '{print $5}'))"
+          APK=$(find android/app/build/outputs -name "*.apk" | head -1)
+          if [ -z "$APK" ]; then
+            echo "ERROR: No APK found!"
+            exit 1
+          fi
+          FINAL="Flowith_${VERSION}_android.apk"
+          cp "$APK" "$FINAL"
+          echo "APK: $FINAL ($(ls -lh "$FINAL" | awk '{print $5}'))"
 
       - name: Upload APK to GitHub Release
         uses: softprops/action-gh-release@v2
