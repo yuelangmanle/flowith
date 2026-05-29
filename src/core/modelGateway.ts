@@ -111,8 +111,35 @@ export async function discoverModels(
     data?: Array<{ id: string }>;
     models?: Array<{ name: string }>;
   };
-  const ids =
+  let ids =
     body.data?.map((model) => model.id) ?? body.models?.map((model) => model.name) ?? [];
+  
+  // Filter out known deprecated/obsolete models
+  const DEPRECATED_IDS = new Set([
+    "deepseek-coder",
+    "deepseek-coder-v2",
+    "deepseek-v2.5",
+    "deepseek-v2",
+    "deepseek-v1.5",
+    "deepseek-lite",
+    "gpt-3.5-turbo",
+    "gpt-3.5-turbo-0613",
+    "gpt-3.5-turbo-16k",
+    "gpt-3.5-turbo-instruct",
+    "gpt-4-0314",
+    "gpt-4-0613",
+    "gpt-4-32k",
+    "gpt-4-32k-0613",
+    "text-davinci-003",
+    "text-davinci-002",
+    "text-embedding-ada-002",
+    "davinci-002",
+    "babbage-002",
+  ]);
+  // Also filter by prefix patterns for broader coverage
+  const DEPRECATED_PREFIXES = ["dall-e-", "whisper-", "tts-", "ft:gpt-3.5"];
+  ids = ids.filter((id) => !DEPRECATED_IDS.has(id) && !DEPRECATED_PREFIXES.some((p) => id.startsWith(p)));
+  
   return ids.map((id) => toModel(provider, id));
 }
 

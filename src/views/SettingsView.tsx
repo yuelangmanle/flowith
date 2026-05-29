@@ -40,6 +40,7 @@ export function SettingsView() {
   } = useStore();
 
   const [expandedProvider, setExpandedProvider] = useState<string | null>(null);
+  const [customModelId, setCustomModelId] = useState("");
   const [expandedTTS, setExpandedTTS] = useState<string | null>(null);
 
   const updateProvider = (id: string, updater: (p: ProviderConfig) => ProviderConfig) => {
@@ -356,6 +357,47 @@ export function SettingsView() {
                     }
                   }}><RefreshCw size={14} /> 发现模型</button>
                 </div>
+                {/* Custom model ID input */}
+                <div style={{ display: "flex", gap: 6, marginTop: 6, alignItems: "center" }}>
+                  <input
+                    placeholder="输入自定义模型 ID (如 gpt-4o-custom)"
+                    value={customModelId}
+                    onChange={(e) => setCustomModelId(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && customModelId.trim()) {
+                        const id = customModelId.trim();
+                        const existing = models.find((m) => m.providerId === p.id && m.id === id);
+                        if (existing) { showToast("模型已存在", "error"); return; }
+                        const newModel: ModelConfig = { id, providerId: p.id, name: id, capabilities: {} };
+                        setModels((prev) => [...prev, newModel]);
+                        setCustomModelId("");
+                        showToast(`已添加 ${id}`, "success");
+                      }
+                    }}
+                    style={{ flex: 1, padding: "4px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--bg)", color: "var(--text-primary)", fontSize: 12 }}
+                  />
+                  <button onClick={() => {
+                    if (!customModelId.trim()) return;
+                    const id = customModelId.trim();
+                    const existing = models.find((m) => m.providerId === p.id && m.id === id);
+                    if (existing) { showToast("模型已存在", "error"); return; }
+                    const newModel: ModelConfig = { id, providerId: p.id, name: id, capabilities: {} };
+                    setModels((prev) => [...prev, newModel]);
+                    setCustomModelId("");
+                    showToast(`已添加 ${id}`, "success");
+                  }} style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--primary)", color: "#fff", cursor: "pointer", fontSize: 12, whiteSpace: "nowrap" }}>添加模型</button>
+                </div>
+                {/* Show existing models for this provider */}
+                {models.filter((m) => m.providerId === p.id).length > 0 && (
+                  <div style={{ marginTop: 6, display: "flex", flexWrap: "wrap", gap: 4 }}>
+                    {models.filter((m) => m.providerId === p.id).map((m) => (
+                      <span key={m.id} style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4, background: m.stale ? "rgba(239,68,68,0.1)" : "var(--bg)", border: `1px solid ${m.stale ? "rgba(239,68,68,0.3)" : "var(--border)"}`, color: m.stale ? "#ef4444" : "var(--text-muted)", display: "flex", alignItems: "center", gap: 4 }}>
+                        {m.id}
+                        <button onClick={() => setModels((prev) => prev.filter((x) => !(x.providerId === p.id && x.id === m.id)))} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", padding: 0, fontSize: 12, lineHeight: 1 }}>×</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

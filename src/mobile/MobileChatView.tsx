@@ -346,6 +346,14 @@ export function MobileChatView() {
       const provider = effectiveProvider;
       if (!provider) { showToast("请先配置 API 密钥", "error"); setStreaming(false); return; }
 
+      // Ensure a model is available
+      const modelId = effectiveModel?.id || models.find((m) => m.providerId === provider.id)?.id;
+      if (!modelId && provider.type !== "ollama") {
+        showToast("请先发现或添加模型", "error");
+        setStreaming(false);
+        return;
+      }
+
       const controller = new AbortController();
       abortRef.current = controller;
 
@@ -353,7 +361,7 @@ export function MobileChatView() {
         conversationId: convId, message: msg,
         agentId: selectedAgentId || undefined,
         providerId: provider.id,
-        model: effectiveModel?.id,
+        model: modelId,
       };
       if (userMsg.imageData) body.imageData = userMsg.imageData;
       if (userMsg.additionalImages) body.additionalImages = userMsg.additionalImages;
@@ -365,6 +373,18 @@ export function MobileChatView() {
         body: JSON.stringify(body),
         signal: controller.signal,
       });
+
+      // Check for API errors before parsing SSE
+      if (!resp.ok) {
+        let errMsg = `API 错误 ${resp.status}`;
+        try {
+          const errData = await resp.json() as { error?: string };
+          errMsg = errData.error ?? errMsg;
+        } catch {}
+        showToast(errMsg, "error");
+        setStreaming(false);
+        return;
+      }
 
       // Parse SSE response - handle both streaming and buffered responses
       let full = "";

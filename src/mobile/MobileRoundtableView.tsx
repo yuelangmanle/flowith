@@ -68,6 +68,18 @@ export function MobileRoundtableView() {
         signal: controller.signal,
       });
 
+      // Check for API errors before parsing SSE
+      if (!resp.ok) {
+        let errMsg = `API 错误 ${resp.status}`;
+        try {
+          const errData = await resp.json() as { error?: string };
+          errMsg = errData.error ?? errMsg;
+        } catch {}
+        showToast(errMsg, "error");
+        setRunning(false);
+        return;
+      }
+
       // Parse SSE response - handle both streaming and buffered responses
       let eventType = "";
 

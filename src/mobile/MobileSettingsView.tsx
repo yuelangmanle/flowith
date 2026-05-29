@@ -12,7 +12,7 @@ import type { ProviderConfig, TTSProviderConfig, ModelConfig } from "../core/typ
 // ─── Provider Card ──────────────────────────────────────────────
 
 function ProviderCard({
-  provider, expanded, onToggle, onUpdate, models, onDiscover, discovering,
+  provider, expanded, onToggle, onUpdate, models, onDiscover, discovering, onAddModel,
 }: {
   provider: ProviderConfig;
   expanded: boolean;
@@ -21,9 +21,11 @@ function ProviderCard({
   models: ModelConfig[];
   onDiscover: () => void;
   discovering: boolean;
+  onAddModel?: (id: string) => void;
 }) {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<"ok" | "fail" | "">("");
+  const [customModelId, setCustomModelId] = useState("");
 
   const handleTest = async () => {
     setTesting(true); setTestResult("");
@@ -237,6 +239,27 @@ function ProviderCard({
                 {discovering ? "发现中..." : `发现模型 (${provModels.length})`}
               </button>
             )}
+          </div>
+
+          {/* Custom model input */}
+          <div style={{ display: "flex", gap: 6, marginTop: 8, alignItems: "center" }}>
+            <input
+              placeholder="输入模型 ID"
+              value={customModelId}
+              onChange={(e) => setCustomModelId(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && customModelId.trim() && onAddModel) {
+                  onAddModel(customModelId.trim());
+                  setCustomModelId("");
+                }
+              }}
+              style={{ flex: 1, padding: "6px 10px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-secondary)", color: "var(--text-primary)", fontSize: 12, outline: "none" }}
+            />
+            <button onClick={() => {
+              if (!customModelId.trim() || !onAddModel) return;
+              onAddModel(customModelId.trim());
+              setCustomModelId("");
+            }} style={{ padding: "6px 12px", borderRadius: 8, border: "none", background: "var(--primary)", color: "#fff", cursor: "pointer", fontSize: 12, whiteSpace: "nowrap" }}>添加</button>
           </div>
 
           {/* Discovered models */}
@@ -594,6 +617,12 @@ export function MobileSettingsView() {
               models={models}
               onDiscover={() => handleDiscover(p.id)}
               discovering={discovering === p.id}
+              onAddModel={(id) => {
+                const existing = models.find((m) => m.providerId === p.id && m.id === id);
+                if (existing) { showToast("模型已存在", "error"); return; }
+                setModels((prev) => [...prev, { id, providerId: p.id, name: id, capabilities: {} }]);
+                showToast(`已添加 ${id}`, "success");
+              }}
             />
           ))}
         </div>
