@@ -567,6 +567,14 @@ async function* streamAnthropic(
   if (systemMsg) {
     bodyObj.system = [{ type: "text", text: systemMsg.content, cache_control: { type: "ephemeral" } }];
   }
+  // Cache the last user message for better cache hits on repeated queries
+  const msgs = bodyObj.messages as Array<Record<string, unknown>>;
+  if (msgs.length > 1) {
+    const lastMsg = msgs[msgs.length - 1];
+    if (lastMsg.role === "user") {
+      lastMsg.cache_control = { type: "ephemeral" };
+    }
+  }
 
   if (req.model.includes("sonnet-4") || req.model.includes("opus-4")) {
     bodyObj.thinking = { type: "enabled", budget_tokens: Math.min(dynamicMaxTokens, 10000) };

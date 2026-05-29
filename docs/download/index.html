@@ -121,6 +121,16 @@
     /* ── Scroll animations ── */
     .reveal{opacity:0;transform:translateY(30px);transition:all .8s cubic-bezier(.4,0,.2,1)}
     .reveal.visible{opacity:1;transform:translateY(0)}
+
+    /* ── Changelog ── */
+    .changelog{padding:60px 0}
+    .changelog-list{max-width:700px;margin:0 auto}
+    .changelog-item{padding:20px 24px;margin-bottom:16px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid rgba(99,102,241,.1)}
+    .cl-header{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+    .cl-version{font-size:14px;font-weight:700;color:#a78bfa}
+    .cl-date{font-size:12px;color:rgba(255,255,255,.4)}
+    .changelog-item ul{margin:0;padding-left:20px}
+    .changelog-item li{font-size:13px;color:rgba(255,255,255,.7);line-height:2}
   </style>
 </head>
 <body>
@@ -137,6 +147,7 @@
       </a>
       <div class="links">
         <a href="#features">功能</a>
+        <a href="#changelog">更新日志</a>
         <a href="https://github.com/yuelangmanle/flowith">GitHub</a>
         <a href="https://github.com/yuelangmanle/flowith/releases/latest">Releases</a>
       </div>
@@ -145,11 +156,11 @@
 
   <div class="wrap">
     <section class="hero">
-      <div class="hero-badge"><span class="dot"></span> v1.0.0 正式发布</div>
+      <div class="hero-badge"><span class="dot"></span> v1.1.0 更新</div>
       <h1>Flowith</h1>
       <p>多 AI Agent 协作工作平台。多种模型、圆桌讨论、代码生成、技能管理，让 AI 为你流动协作。</p>
       <div class="dl-cards">
-        <a class="dl-card primary" href="https://github.com/yuelangmanle/flowith/releases/download/v1.0.0/Flowith_1.0.0_aarch64.dmg">
+        <a class="dl-card primary" href="https://github.com/yuelangmanle/flowith/releases/download/v1.1.0/Flowith_1.1.0_aarch64.dmg">
           <span class="ic">&#127822;</span>
           <span class="txt"><span class="name">macOS 版</span><span class="meta">Apple Silicon · ~6 MB</span></span>
         </a>
@@ -188,10 +199,37 @@
       <span>Node.js</span><span>Vite</span><span>Zustand</span><span>Vitest</span>
     </section>
 
+    <section id="changelog" class="changelog reveal">
+      <div class="section-title"><h2>更新日志</h2><p>持续进化的 AI 协作体验</p></div>
+      <div class="changelog-list">
+        <div class="changelog-item">
+          <div class="cl-header"><span class="cl-version">v1.1.0</span><span class="cl-date">2026-05-29</span></div>
+          <ul>
+            <li>🧠 记忆系统完整增强：自动捕获、自动注入、规则整合、自动去重</li>
+            <li>🔍 搜索算法升级：Jaccard 相似度 + 停用词过滤</li>
+            <li>💬 圆桌讨论记忆集成</li>
+            <li>⚡ Anthropic prompt caching 增强</li>
+            <li>🔧 MiMo WebSearch 修复</li>
+          </ul>
+        </div>
+        <div class="changelog-item">
+          <div class="cl-header"><span class="cl-version">v1.0.0</span><span class="cl-date">2026-05-28</span></div>
+          <ul>
+            <li>🎉 首个正式版本</li>
+            <li>多 Agent 协作平台（顺序/层级/圆桌）</li>
+            <li>支持 9+ AI 模型供应商</li>
+            <li>Skills 技能市场</li>
+            <li>Tauri 桌面打包（macOS）</li>
+            <li>L1-L4 记忆系统 + Token 优化</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
     <section class="cta reveal">
       <h2>开始使用 Flowith</h2>
       <p>免费开源，支持 macOS 和 Windows</p>
-      <a class="cta-btn" href="https://github.com/yuelangmanle/flowith/releases/download/v1.0.0/Flowith_1.0.0_aarch64.dmg">
+      <a class="cta-btn" href="https://github.com/yuelangmanle/flowith/releases/download/v1.1.0/Flowith_1.1.0_aarch64.dmg">
         立即下载
       </a>
     </section>

@@ -601,6 +601,69 @@ export function SettingsView() {
           </div>
         ))}
       </div>
+
+      {/* Changelog */}
+      <ChangelogSection />
+    </div>
+  );
+}
+
+// ─── Changelog Section ─────────────────────────────────────────
+
+function ChangelogSection() {
+  const [expanded, setExpanded] = useState(false);
+  const versions = [
+    {
+      version: "v1.1.0",
+      date: "2026-05-29",
+      changes: [
+        "🧠 记忆系统完整增强：自动捕获、自动注入、规则整合、自动去重",
+        "🔍 搜索算法升级：Jaccard 相似度 + 停用词过滤",
+        "💬 圆桌讨论记忆集成",
+        "⚡ Anthropic prompt caching 增强",
+        "🔧 MiMo WebSearch 修复",
+      ],
+    },
+    {
+      version: "v1.0.0",
+      date: "2026-05-28",
+      changes: [
+        "🎉 首个正式版本",
+        "多 Agent 协作平台（顺序/层级/圆桌）",
+        "支持 9+ AI 模型供应商",
+        "Skills 技能市场",
+        "Tauri 桌面打包（macOS）",
+        "L1-L4 记忆系统",
+        "Token-aware 上下文管理",
+      ],
+    },
+  ];
+
+  return (
+    <div style={{ marginTop: 24, padding: "16px 20px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-card)" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }} onClick={() => setExpanded(!expanded)}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ fontSize: 16 }}>📋</span>
+          <span style={{ fontSize: 14, fontWeight: 600 }}>更新日志</span>
+          <span style={{ fontSize: 11, color: "var(--text-muted)", background: "var(--bg)", padding: "2px 8px", borderRadius: 4 }}>v1.1.0</span>
+        </div>
+        <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{expanded ? "收起" : "展开"}</span>
+      </div>
+      {expanded && (
+        <div style={{ marginTop: 12 }}>
+          {versions.map((v) => (
+            <div key={v.version} style={{ marginBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--primary)" }}>{v.version}</span>
+                <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{v.date}</span>
+              </div>
+              <ul style={{ margin: 0, paddingLeft: 20 }}>
+                {v.changes.map((c, i) => <li key={i} style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.8 }}>{c}</li>)}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
