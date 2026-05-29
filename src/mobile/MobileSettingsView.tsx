@@ -565,7 +565,6 @@ export function MobileSettingsView() {
 
         {/* ─── Auto-update ─── */}
         <div style={{ marginBottom: 20, display: "flex", alignItems: "center", gap: 8 }}>
-          <UpdateChecker currentVersion="1.3.2" platform="android" />
           <UpdateChecker currentVersion="1.3.2" platform="android" mode="compact" />
         </div>
 

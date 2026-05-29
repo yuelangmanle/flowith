@@ -7,6 +7,7 @@ import { compressImage, formatBytes } from "../lib/imageCompress";
 import type { CompressResult } from "../lib/imageCompress";
 import type { ChatMessage } from "../core/types";
 import { UserIcon, BotIcon, BrainIcon, ZapIcon, EyeIcon, FileIcon, LinkIcon, ChatIcon } from "../components/icons";
+import { ThinkingBlock } from "../components/ThinkingBlock";
 import { estimateTokens } from "../core/tokenCounter";
 
 export function ChatView() {
@@ -176,6 +177,9 @@ export function ChatView() {
     let processedContent = content;
     // Normalize old [思考]...[/思考] format to <think>...</think>
     processedContent = processedContent.replace(/\[思考\]([\s\S]*?)\[\/思考\]/g, '<think>$1</think>');
+    // Merge adjacent <think> blocks (streaming sends many small blocks)
+    let prevMerge = "";
+    while (prevMerge !== processedContent) { prevMerge = processedContent; processedContent = processedContent.replace(/<\/think>[\s\n]*<think>>/g, "\n"); }
 
     const thinkingParts = processedContent.split(/(<think>[\s\S]*?<\/think>)/g);
     const thinkingBlocks: string[] = [];
@@ -233,29 +237,7 @@ export function ChatView() {
     });
 
     const thinkingPanel = thinkingText ? (
-      <div style={{ marginBottom: 8, borderRadius: 8, border: "1px solid var(--border)", overflow: "hidden" }}>
-        <button
-          onClick={() => setExpandedThinking((prev) => {
-            const n = new Set(prev);
-            if (n.has(msgId)) n.delete(msgId); else n.add(msgId);
-            return n;
-          })}
-          style={{
-            display: "flex", alignItems: "center", gap: 6, width: "100%",
-            padding: "8px 12px", background: "var(--bg)", border: "none", cursor: "pointer",
-            fontSize: 12, color: "var(--text-secondary)", fontWeight: 500,
-          }}
-        >
-          <span style={{ fontSize: 14 }}>{isThinkingExpanded ? "▼" : "▶"}</span>
-          <span>深度思考</span>
-          <span style={{ opacity: 0.5, fontSize: 11 }}>({thinkingText.length} 字)</span>
-        </button>
-        {isThinkingExpanded && (
-          <div style={{ padding: "8px 12px", whiteSpace: "pre-wrap", fontSize: 12, lineHeight: 1.6, color: "var(--text-secondary)", borderTop: "1px solid var(--border)", maxHeight: 400, overflow: "auto" }}>
-            {thinkingText}
-          </div>
-        )}
-      </div>
+      <ThinkingBlock content={thinkingText} defaultExpanded={expandedThinking.has(msgId)} />
     ) : null;
 
     if (isLong && !isExpanded) {

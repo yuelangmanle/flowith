@@ -6,6 +6,15 @@ import { apiFetch, getProviderIcon } from "../lib/shared";
 import { saveProviders } from "../core/persistence";
 import type { ModelConfig, ProviderConfig, TTSProviderConfig } from "../core/types";
 
+// App version
+const APP_VERSION = "1.3.2";
+function detectPlatform(): "mac" | "win" | "android" {
+  if ((window as any).Capacitor) return "android";
+  const ua = navigator.userAgent.toLowerCase();
+  if (ua.includes("win")) return "win";
+  return "mac";
+}
+
 // ─── TTS Provider Icons ────────────────────────────────────────
 
 function getTTSIcon(type: string): string {
@@ -605,8 +614,7 @@ export function SettingsView() {
 
       {/* Auto-update */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-        <UpdateChecker currentVersion="1.3.2" platform="mac" />
-        <UpdateChecker currentVersion="1.3.2" platform="mac" mode="compact" />
+        <UpdateChecker currentVersion={APP_VERSION} platform={detectPlatform()} mode="compact" />
       </div>
 
       {/* Changelog */}
