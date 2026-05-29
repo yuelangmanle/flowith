@@ -1,6 +1,6 @@
 {
   "name": "multi-agent-workspace",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,9 +13,16 @@
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
-    "build:sidecar": "node scripts/build-sidecar.mjs"
+    "build:sidecar": "node scripts/build-sidecar.mjs",
+    "cap": "cap",
+    "cap:sync": "cap sync",
+    "cap:android": "cap add android",
+    "cap:open": "cap open android",
+    "build:mobile": "tsc -b && vite build && cap sync"
   },
   "dependencies": {
+    "@capacitor/android": "^8.3.4",
+    "@capacitor/core": "^8.3.4",
     "@tauri-apps/api": "^2.11.0",
     "@vitejs/plugin-react": "^5.0.0",
     "lucide-react": "^0.468.0",
@@ -37,6 +44,7 @@
     "esbuild": "^0.28.0",
     "jsdom": "^26.0.0",
     "tsx": "^4.19.0",
-    "vitest": "^3.0.0"
+    "vitest": "^3.0.0",
+    "@capacitor/cli": "^8.3.4"
   }
 }

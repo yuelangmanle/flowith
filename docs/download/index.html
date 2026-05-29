@@ -11,7 +11,6 @@
     html{scroll-behavior:smooth}
     body{font-family:'Inter',system-ui,sans-serif;background:#050510;color:#e2e8f0;overflow-x:hidden;line-height:1.6}
 
-    /* Animated BG */
     .bg{position:fixed;inset:0;z-index:0;overflow:hidden}
     .bg .orb{position:absolute;border-radius:50%;filter:blur(100px);opacity:.4;animation:float 20s ease-in-out infinite}
     .bg .orb:nth-child(1){width:600px;height:600px;background:#6366f1;top:-10%;left:-10%;animation-delay:0s}
@@ -26,7 +25,6 @@
 
     .wrap{position:relative;z-index:1;max-width:1000px;margin:0 auto;padding:0 24px}
 
-    /* Nav */
     nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:16px 0;
       backdrop-filter:blur(20px);background:rgba(5,5,16,.6);border-bottom:1px solid rgba(255,255,255,.04)}
     nav .wrap{display:flex;align-items:center;justify-content:space-between}
@@ -36,7 +34,6 @@
     nav .links a{color:#94a3b8;text-decoration:none;font-size:14px;font-weight:500;transition:color .2s}
     nav .links a:hover{color:#fff}
 
-    /* Hero */
     .hero{padding:160px 0 80px;text-align:center}
     .hero-badge{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border-radius:100px;
       background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.2);font-size:13px;color:#a5b4fc;margin-bottom:28px;
@@ -51,7 +48,6 @@
       animation:fadeUp .8s ease-out .2s both}
     @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
 
-    /* Download cards */
     .dl-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;max-width:760px;margin:0 auto 60px;
       animation:fadeUp .8s ease-out .3s both}
     .dl-card{position:relative;display:flex;align-items:center;gap:14px;padding:18px 22px;border-radius:14px;
@@ -73,8 +69,9 @@
     .dl-card.primary .txt .meta{color:rgba(255,255,255,.7)}
     .dl-card .badge-new{position:absolute;top:8px;right:8px;padding:2px 8px;border-radius:6px;
       background:rgba(52,211,153,.2);color:#34d399;font-size:10px;font-weight:600}
+    .dl-card .badge-soon{position:absolute;top:8px;right:8px;padding:2px 8px;border-radius:6px;
+      background:rgba(251,191,36,.15);color:#fbbf24;font-size:10px;font-weight:600}
 
-    /* Platform tabs */
     .platform-tabs{display:flex;justify-content:center;gap:8px;margin-bottom:32px;
       animation:fadeUp .8s ease-out .25s both}
     .platform-tab{padding:8px 20px;border-radius:8px;border:1px solid rgba(255,255,255,.08);
@@ -82,14 +79,12 @@
     .platform-tab.active{background:rgba(99,102,241,.15);border-color:rgba(99,102,241,.3);color:#a5b4fc}
     .platform-tab:hover{border-color:rgba(255,255,255,.15);color:#e2e8f0}
 
-    /* Sections */
     section{padding:80px 0}
     .section-title{text-align:center;margin-bottom:48px}
     .section-title h2{font-size:32px;font-weight:800;letter-spacing:-1px;margin-bottom:8px;
       background:linear-gradient(135deg,#fff,#c7d2fe);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
     .section-title p{font-size:15px;color:#64748b}
 
-    /* Features */
     .features{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px}
     .feat{padding:28px;border-radius:16px;background:rgba(255,255,255,.02);
       border:1px solid rgba(255,255,255,.04);transition:all .3s}
@@ -98,19 +93,66 @@
     .feat h3{font-size:16px;font-weight:700;margin-bottom:8px;color:#e2e8f0}
     .feat p{font-size:13px;color:#64748b;line-height:1.7}
 
-    /* Stats */
     .stats{display:flex;justify-content:center;gap:48px;flex-wrap:wrap;padding:60px 0}
     .stat{text-align:center}
     .stat .num{font-size:40px;font-weight:900;background:linear-gradient(135deg,#6366f1,#a78bfa);
       -webkit-background-clip:text;-webkit-text-fill-color:transparent}
     .stat .label{font-size:13px;color:#64748b;margin-top:4px}
 
-    /* Tech */
     .tech{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;padding:40px 0}
     .tech span{padding:6px 16px;border-radius:8px;background:rgba(255,255,255,.04);
       border:1px solid rgba(255,255,255,.06);font-size:12px;color:#94a3b8;font-weight:500}
 
-    /* Changelog */
+    /* Feature comparison table */
+    .compare-table-wrap{max-width:760px;margin:0 auto;overflow-x:auto;
+      animation:fadeUp .8s ease-out .3s both}
+    .compare-table{width:100%;border-collapse:collapse;border-radius:14px;overflow:hidden;
+      background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.06)}
+    .compare-table thead th{padding:14px 20px;font-size:14px;font-weight:700;text-align:center;
+      background:rgba(99,102,241,.1);color:#a5b4fc;border-bottom:1px solid rgba(255,255,255,.06)}
+    .compare-table thead th:first-child{text-align:left;color:#e2e8f0}
+    .compare-table tbody td{padding:12px 20px;font-size:13px;text-align:center;
+      border-bottom:1px solid rgba(255,255,255,.03);color:#94a3b8}
+    .compare-table tbody td:first-child{text-align:left;color:#e2e8f0;font-weight:500}
+    .compare-table tbody tr:hover{background:rgba(99,102,241,.03)}
+    .compare-table .check{color:#34d399;font-weight:700}
+    .compare-table .cross{color:#64748b}
+    .compare-table .soon{color:#fbbf24;font-size:11px}
+
+    /* Install guide */
+    .install-guide{max-width:700px;margin:0 auto}
+    .install-section{margin-bottom:16px;border-radius:14px;background:rgba(255,255,255,.02);
+      border:1px solid rgba(255,255,255,.06);overflow:hidden;transition:all .3s}
+    .install-section:hover{border-color:rgba(99,102,241,.15)}
+    .install-header{display:flex;align-items:center;gap:12px;padding:18px 24px;cursor:pointer;user-select:none}
+    .install-header .icon{font-size:24px}
+    .install-header .info{flex:1}
+    .install-header .info h3{font-size:15px;font-weight:700;color:#e2e8f0}
+    .install-header .info p{font-size:12px;color:#64748b;margin-top:2px}
+    .install-header .arrow{font-size:18px;color:#64748b;transition:transform .3s}
+    .install-section.open .install-header .arrow{transform:rotate(180deg)}
+    .install-body{padding:0 24px 20px;display:none}
+    .install-section.open .install-body{display:block}
+    .install-step{display:flex;gap:14px;margin-bottom:16px}
+    .install-step .num{width:28px;height:28px;border-radius:50%;background:rgba(99,102,241,.15);
+      color:#a5b4fc;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .install-step .content{flex:1}
+    .install-step .content h4{font-size:14px;font-weight:600;color:#e2e8f0;margin-bottom:4px}
+    .install-step .content p{font-size:13px;color:#64748b;line-height:1.6}
+    .install-step .content code{padding:2px 8px;border-radius:4px;background:rgba(99,102,241,.1);
+      color:#a5b4fc;font-size:12px;font-family:'JetBrains Mono',monospace}
+    .install-tip{padding:12px 16px;border-radius:8px;background:rgba(251,191,36,.08);
+      border:1px solid rgba(251,191,36,.15);font-size:12px;color:#fbbf24;line-height:1.6;margin-top:8px}
+
+    /* System requirements */
+    .sys-req{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;max-width:760px;margin:0 auto}
+    .sys-card{padding:20px;border-radius:14px;background:rgba(255,255,255,.02);
+      border:1px solid rgba(255,255,255,.06);transition:all .3s}
+    .sys-card:hover{border-color:rgba(99,102,241,.15)}
+    .sys-card h4{font-size:14px;font-weight:700;color:#e2e8f0;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+    .sys-card ul{list-style:none;padding:0}
+    .sys-card li{font-size:12px;color:#64748b;line-height:2;padding-left:4px}
+
     .changelog-list{max-width:640px;margin:0 auto}
     .changelog-item{padding:24px;border-radius:14px;background:rgba(255,255,255,.02);
       border:1px solid rgba(255,255,255,.04);margin-bottom:16px;transition:all .3s}
@@ -122,7 +164,6 @@
     .changelog-item ul{list-style:none;padding:0}
     .changelog-item li{font-size:13px;color:#94a3b8;line-height:2;padding-left:4px}
 
-    /* CTA */
     .cta{text-align:center;padding:80px 0}
     .cta h2{font-size:28px;font-weight:800;margin-bottom:12px;color:#fff}
     .cta p{font-size:15px;color:#64748b;margin-bottom:32px}
@@ -131,18 +172,15 @@
       text-decoration:none;transition:all .3s;box-shadow:0 8px 24px rgba(99,102,241,.3)}
     .cta-btn:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(99,102,241,.4)}
 
-    /* Footer */
     footer{border-top:1px solid rgba(255,255,255,.04);padding:32px 0;text-align:center}
     footer div{display:flex;justify-content:center;gap:24px;margin-bottom:12px}
     footer a{color:#64748b;text-decoration:none;font-size:13px;transition:color .2s}
     footer a:hover{color:#a5b4fc}
     footer .copy{font-size:12px;color:#334155}
 
-    /* Reveal */
     .reveal{opacity:0;transform:translateY(24px);transition:all .7s cubic-bezier(.4,0,.2,1)}
     .reveal.visible{opacity:1;transform:translateY(0)}
 
-    /* Source run box */
     .source-run{max-width:640px;margin:0 auto 60px;padding:20px 24px;border-radius:12px;
       background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);
       animation:fadeUp .8s ease-out .35s both}
@@ -150,6 +188,11 @@
     .source-run pre{margin-top:12px;padding:16px;border-radius:8px;background:rgba(0,0,0,.3);
       font-family:'JetBrains Mono',monospace;font-size:13px;color:#a5b4fc;overflow-x:auto;line-height:1.8}
     .source-run code{color:#e2e8f0}
+
+    .loading-skeleton{display:inline-block;width:60px;height:14px;border-radius:4px;
+      background:linear-gradient(90deg,rgba(255,255,255,.04) 25%,rgba(255,255,255,.08) 50%,rgba(255,255,255,.04) 75%);
+      background-size:200% 100%;animation:shimmer 1.5s infinite}
+    @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
   </style>
 </head>
 <body>
@@ -164,6 +207,8 @@
       </a>
       <div class="links">
         <a href="#features">功能</a>
+        <a href="#compare">平台对比</a>
+        <a href="#install">安装指南</a>
         <a href="#changelog">更新日志</a>
         <a href="https://github.com/yuelangmanle/flowith">GitHub</a>
       </div>
@@ -172,44 +217,50 @@
 
   <div class="wrap">
     <section class="hero">
-      <div class="hero-badge"><span class="dot"></span> v1.1.1 已发布 · macOS + Windows</div>
+      <div class="hero-badge"><span class="dot"></span> <span id="hero-version">v1.1.1</span> 已发布 · macOS + Windows</div>
       <h1>Flowith</h1>
       <p>多 AI Agent 智能协作平台。多个 AI 各司其职，圆桌讨论、顺序编排、层级协作，一站式完成复杂任务。</p>
 
       <div class="platform-tabs">
-        <span class="platform-tab active" onclick="showPlatform('all')">全部平台</span>
-        <span class="platform-tab" onclick="showPlatform('mac')">macOS</span>
-        <span class="platform-tab" onclick="showPlatform('win')">Windows</span>
-        <span class="platform-tab" onclick="showPlatform('src')">源码</span>
+        <span class="platform-tab active" onclick="showPlatform('all', event)">全部平台</span>
+        <span class="platform-tab" onclick="showPlatform('mac', event)">macOS</span>
+        <span class="platform-tab" onclick="showPlatform('win', event)">Windows</span>
+        <span class="platform-tab" onclick="showPlatform('android', event)">Android</span>
+        <span class="platform-tab" onclick="showPlatform('src', event)">源码</span>
       </div>
 
       <div class="dl-grid" id="dl-grid">
-        <a class="dl-card primary" href="https://github.com/yuelangmanle/flowith/releases/download/v1.1.1/Flowith_1.1.1_aarch64.dmg" data-platform="mac">
+        <a class="dl-card primary" href="https://github.com/yuelangmanle/flowith/releases/download/v1.1.1/Flowith_1.1.1_aarch64.dmg" data-platform="mac" data-pattern="Flowith_{V}_aarch64.dmg">
           <span class="ic">&#127822;</span>
           <span class="txt"><span class="name">macOS Apple Silicon</span><span class="meta">DMG · ~6 MB</span></span>
           <span class="badge-new">推荐</span>
         </a>
-        <a class="dl-card" href="https://github.com/yuelangmanle/flowith/releases/download/v1.1.1/Flowith_1.1.1_x64.dmg" data-platform="mac">
+        <a class="dl-card" href="https://github.com/yuelangmanle/flowith/releases/download/v1.1.1/Flowith_1.1.1_x64.dmg" data-platform="mac" data-pattern="Flowith_{V}_x64.dmg">
           <span class="ic">&#127822;</span>
           <span class="txt"><span class="name">macOS Intel</span><span class="meta">DMG · ~6 MB</span></span>
         </a>
-        <a class="dl-card" href="https://github.com/yuelangmanle/flowith/releases/download/v1.1.1/Flowith_1.1.1_x64-setup.exe" data-platform="win">
+        <a class="dl-card" href="https://github.com/yuelangmanle/flowith/releases/download/v1.1.1/Flowith_1.1.1_x64-setup.exe" data-platform="win" data-pattern="Flowith_{V}_x64-setup.exe">
           <span class="ic">&#128187;</span>
-          <span class="txt"><span class="name">Windows 安装包</span><span class="meta">EXE · ~5 MB</span></span>
-          <span class="badge-new">NEW</span>
+          <span class="txt"><span class="name">Windows EXE</span><span class="meta">安装包 · ~6 MB</span></span>
+          <span class="badge-new">推荐</span>
         </a>
-        <a class="dl-card" href="https://github.com/yuelangmanle/flowith/releases/download/v1.1.1/Flowith_1.1.1_x64_en-US.msi" data-platform="win">
+        <a class="dl-card" href="https://github.com/yuelangmanle/flowith/releases/download/v1.1.1/Flowith_1.1.1_x64_en-US.msi" data-platform="win" data-pattern="Flowith_{V}_x64_en-US.msi">
           <span class="ic">&#128187;</span>
-          <span class="txt"><span class="name">Windows MSI</span><span class="meta">MSI · ~5 MB</span></span>
+          <span class="txt"><span class="name">Windows MSI</span><span class="meta">安装包 · ~6 MB</span></span>
         </a>
+        <div class="dl-card" data-platform="android" style="opacity:.6;cursor:default">
+          <span class="ic">&#128241;</span>
+          <span class="txt"><span class="name">Android APK</span><span class="meta">即将推出</span></span>
+          <span class="badge-soon">即将推出</span>
+        </div>
         <a class="dl-card" href="https://github.com/yuelangmanle/flowith/releases/latest" data-platform="src">
-          <span class="ic">&#127760;</span>
-          <span class="txt"><span class="name">全部版本</span><span class="meta">GitHub Releases</span></span>
+          <span class="ic">&#128230;</span>
+          <span class="txt"><span class="name">源码</span><span class="meta">GitHub Releases</span></span>
         </a>
       </div>
 
       <details class="source-run">
-        <summary>&#128187; 或者从源码运行</summary>
+        <summary>&#9654; 从源码运行</summary>
         <pre><code>git clone https://github.com/yuelangmanle/flowith.git
 cd flowith
 npm install
@@ -217,12 +268,13 @@ npm run dev</code></pre>
       </details>
     </section>
 
-    <section id="features">
-      <div class="section-title reveal"><h2>强大功能</h2><p>一站式 AI 协作体验</p></div>
+    <section id="features" class="reveal">
+      <div class="section-title"><h2>功能特性</h2><p>一站式的多 AI 协作体验</p></div>
       <div class="features">
-        <div class="feat reveal"><div class="fi">&#129302;</div><h3>多 Agent 协作</h3><p>顺序、层级、圆桌讨论等多种编排模式，多个 AI 各司其职协同完成复杂任务</p></div>
-        <div class="feat reveal"><div class="fi">&#128640;</div><h3>多模型支持</h3><p>OpenAI、Claude、DeepSeek、MiMo、千问、Moonshot、Gemini、Ollama 一键切换</p></div>
-        <div class="feat reveal"><div class="fi">&#128736;&#65039;</div><h3>技能系统</h3><p>安装管理 AI 技能插件，Agent 自动学习运用，支持联网搜索和本地导入</p></div>
+        <div class="feat reveal"><div class="fi">&#129302;</div><h3>多 Agent 协作</h3><p>顺序编排、层级编排、圆桌讨论三种模式，多个 AI 各司其职高效协作</p></div>
+        <div class="feat reveal"><div class="fi">&#128640;</div><h3>多模型支持</h3><p>OpenAI、Anthropic、DeepSeek、Gemini、MiMo、Qwen 等 9+ 供应商一站式接入</p></div>
+        <div class="feat reveal"><div class="fi">&#128172;</div><h3>圆桌讨论</h3><p>QQ 群聊式 UI，多 AI 辩论投票，支持反方角色，生成结构化报告</p></div>
+        <div class="feat reveal"><div class="fi">&#127919;</div><h3>技能系统</h3><p>安装管理 AI 技能插件，Agent 自动学习运用，支持联网搜索和本地导入</p></div>
         <div class="feat reveal"><div class="fi">&#128187;</div><h3>代码生成</h3><p>从想法到可运行代码的 AI 驱动全流程，支持工作空间隔离和多轮修复</p></div>
         <div class="feat reveal"><div class="fi">&#128172;</div><h3>深度思考</h3><p>Claude、DeepSeek、Gemini 深度思考模式，思考过程可折叠展示</p></div>
         <div class="feat reveal"><div class="fi">&#129504;</div><h3>智能记忆</h3><p>L1-L4 分层记忆架构，自动捕获、自动注入、规则整合、去重合并</p></div>
@@ -235,41 +287,166 @@ npm run dev</code></pre>
       <div class="stat"><div class="num">9+</div><div class="label">模型供应商</div></div>
       <div class="stat"><div class="num">3</div><div class="label">编排模式</div></div>
       <div class="stat"><div class="num">78</div><div class="label">测试用例</div></div>
-      <div class="stat"><div class="num">2</div><div class="label">桌面平台</div></div>
+      <div class="stat"><div class="num">3</div><div class="label">目标平台</div></div>
       <div class="stat"><div class="num">~6MB</div><div class="label">安装包</div></div>
+    </section>
+
+    <section id="compare" class="reveal">
+      <div class="section-title"><h2>平台功能对比</h2><p>各平台功能支持情况</p></div>
+      <div class="compare-table-wrap">
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th>功能</th>
+              <th>&#127822; macOS</th>
+              <th>&#128187; Windows</th>
+              <th>&#128241; Android</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>多 Agent 对话</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
+            <tr><td>圆桌讨论</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
+            <tr><td>智能记忆系统</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
+            <tr><td>Skills 技能市场</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
+            <tr><td>Token 优化 & 缓存</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
+            <tr><td>语音合成 (TTS)</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
+            <tr><td>代码生成流水线</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="soon">即将推出</td></tr>
+            <tr><td>深度思考模式</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="check">&#10003;</td></tr>
+            <tr><td>本地文件工作空间</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="cross">—</td></tr>
+            <tr><td>自动更新</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="cross">—</td></tr>
+            <tr><td>离线运行 (Ollama)</td><td class="check">&#10003;</td><td class="check">&#10003;</td><td class="cross">—</td></tr>
+          </tbody>
+        </table>
+      </div>
     </section>
 
     <section class="tech reveal">
       <span>React 19</span><span>TypeScript</span><span>Tauri 2</span><span>Rust</span>
       <span>Node.js</span><span>Vite</span><span>Zustand</span><span>Vitest</span>
+      <span>Capacitor</span><span>IndexedDB</span>
+    </section>
+
+    <section id="install" class="reveal">
+      <div class="section-title"><h2>安装指南</h2><p>几步即可开始使用 Flowith</p></div>
+      <div class="install-guide">
+        <div class="install-section open">
+          <div class="install-header" onclick="toggleInstall(this)">
+            <span class="icon">&#127822;</span>
+            <div class="info"><h3>macOS 安装</h3><p>Apple Silicon (M1/M2/M3/M4) 或 Intel Mac</p></div>
+            <span class="arrow">&#9660;</span>
+          </div>
+          <div class="install-body">
+            <div class="install-step"><span class="num">1</span><div class="content"><h4>下载 DMG 文件</h4><p>根据你的 Mac 芯片选择对应版本：Apple Silicon 选 aarch64，Intel 选 x64</p></div></div>
+            <div class="install-step"><span class="num">2</span><div class="content"><h4>打开 DMG 并拖入应用程序</h4><p>双击 .dmg 文件，将 Flowith 图标拖到"应用程序"文件夹</p></div></div>
+            <div class="install-step"><span class="num">3</span><div class="content"><h4>首次启动</h4><p>双击启动 Flowith。如提示"无法验证开发者"，前往 <code>系统设置 → 隐私与安全性</code>，点击"仍要打开"</p></div></div>
+            <div class="install-tip">&#9888;&#65039; macOS 安全提示：首次打开第三方应用时，系统可能会阻止运行。这是正常的安全机制，在隐私设置中允许即可。</div>
+          </div>
+        </div>
+
+        <div class="install-section">
+          <div class="install-header" onclick="toggleInstall(this)">
+            <span class="icon">&#128187;</span>
+            <div class="info"><h3>Windows 安装</h3><p>Windows 10 及以上版本</p></div>
+            <span class="arrow">&#9660;</span>
+          </div>
+          <div class="install-body">
+            <div class="install-step"><span class="num">1</span><div class="content"><h4>下载安装包</h4><p>推荐下载 EXE 安装包，也可选择 MSI 格式</p></div></div>
+            <div class="install-step"><span class="num">2</span><div class="content"><h4>运行安装向导</h4><p>双击安装包，按提示完成安装。如出现 SmartScreen 警告，点击"更多信息" → "仍要运行"</p></div></div>
+            <div class="install-step"><span class="num">3</span><div class="content"><h4>启动 Flowith</h4><p>从桌面快捷方式或开始菜单启动，首次使用会进入引导向导配置 AI 模型</p></div></div>
+          </div>
+        </div>
+
+        <div class="install-section">
+          <div class="install-header" onclick="toggleInstall(this)">
+            <span class="icon">&#128230;</span>
+            <div class="info"><h3>从源码运行</h3><p>适合开发者或需要最新功能的用户</p></div>
+            <span class="arrow">&#9660;</span>
+          </div>
+          <div class="install-body">
+            <div class="install-step"><span class="num">1</span><div class="content"><h4>克隆仓库</h4><p><code>git clone https://github.com/yuelangmanle/flowith.git</code></p></div></div>
+            <div class="install-step"><span class="num">2</span><div class="content"><h4>安装依赖</h4><p><code>cd flowith && npm install</code></p></div></div>
+            <div class="install-step"><span class="num">3</span><div class="content"><h4>启动开发服务器</h4><p><code>npm run dev</code>，浏览器访问 <code>http://localhost:5173</code></p></div></div>
+            <div class="install-tip">&#128161; 需要 Node.js 20+。如需桌面应用，运行 <code>npm run tauri:dev</code> 启动 Tauri 桌面版本。</div>
+          </div>
+        </div>
+
+        <div class="install-section">
+          <div class="install-header" onclick="toggleInstall(this)">
+            <span class="icon">&#128241;</span>
+            <div class="info"><h3>Android 安装</h3><p>即将推出</p></div>
+            <span class="arrow">&#9660;</span>
+          </div>
+          <div class="install-body">
+            <div class="install-step"><span class="num">1</span><div class="content"><h4>下载 APK</h4><p>Android 版本正在开发中，将支持 Android 8.0+</p></div></div>
+            <div class="install-step"><span class="num">2</span><div class="content"><h4>安装并启动</h4><p>下载后直接安装，首次使用会进入引导向导</p></div></div>
+            <div class="install-tip">&#128236; 移动端将支持对话、圆桌讨论、记忆管理等核心功能，敬请期待。</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="requirements" class="reveal">
+      <div class="section-title"><h2>系统要求</h2><p>运行 Flowith 的最低配置</p></div>
+      <div class="sys-req">
+        <div class="sys-card">
+          <h4>&#127822; macOS</h4>
+          <ul>
+            <li>macOS 12 (Monterey) 或更高</li>
+            <li>Apple Silicon 或 Intel 处理器</li>
+            <li>4 GB 内存</li>
+            <li>50 MB 可用磁盘空间</li>
+            <li>网络连接（调用 AI API）</li>
+          </ul>
+        </div>
+        <div class="sys-card">
+          <h4>&#128187; Windows</h4>
+          <ul>
+            <li>Windows 10 (1903) 或更高</li>
+            <li>x64 处理器</li>
+            <li>4 GB 内存</li>
+            <li>50 MB 可用磁盘空间</li>
+            <li>网络连接（调用 AI API）</li>
+          </ul>
+        </div>
+        <div class="sys-card">
+          <h4>&#128241; Android</h4>
+          <ul>
+            <li>Android 8.0 (API 26) 或更高</li>
+            <li>ARM64 处理器</li>
+            <li>3 GB 内存</li>
+            <li>30 MB 可用存储空间</li>
+            <li>网络连接（调用 AI API）</li>
+          </ul>
+        </div>
+      </div>
     </section>
 
     <section id="changelog" class="changelog reveal">
       <div class="section-title"><h2>更新日志</h2><p>持续进化的 AI 协作体验</p></div>
-      <div class="changelog-list">
+      <div class="changelog-list" id="changelog-list">
         <div class="changelog-item">
           <div class="cl-header"><span class="cl-version">v1.1.1</span><span class="cl-date">2026-05-29</span></div>
           <ul>
-            <li>🔧 修复 macOS x86_64 CI 构建失败问题</li>
-            <li>🐛 修复 Skills 上下文缓存重复清理</li>
-            <li>🏗️ TypeScript 编译警告修复</li>
-            <li>📦 Windows 构建支持（EXE + MSI）</li>
+            <li>&#128295; 修复 macOS x86_64 CI 构建失败问题</li>
+            <li>&#128027; 修复 Skills 上下文缓存重复清理</li>
+            <li>&#128736;&#65039; TypeScript 编译警告修复</li>
+            <li>&#128230; Windows 构建支持（EXE + MSI）</li>
           </ul>
         </div>
         <div class="changelog-item">
           <div class="cl-header"><span class="cl-version">v1.1.0</span><span class="cl-date">2026-05-29</span></div>
           <ul>
-            <li>🧠 记忆系统完整增强：自动捕获、自动注入、规则整合、自动去重</li>
-            <li>🔍 搜索算法升级：Jaccard 相似度 + 停用词过滤</li>
-            <li>💬 圆桌讨论记忆集成</li>
-            <li>⚡ Anthropic prompt caching 增强</li>
-            <li>🔧 MiMo WebSearch 修复</li>
+            <li>&#129504; 记忆系统完整增强：自动捕获、自动注入、规则整合、自动去重</li>
+            <li>&#128269; 搜索算法升级：Jaccard 相似度 + 停用词过滤</li>
+            <li>&#128172; 圆桌讨论记忆集成</li>
+            <li>&#9889; Anthropic prompt caching 增强</li>
+            <li>&#128295; MiMo WebSearch 修复</li>
           </ul>
         </div>
         <div class="changelog-item">
           <div class="cl-header"><span class="cl-version">v1.0.0</span><span class="cl-date">2026-05-28</span></div>
           <ul>
-            <li>🎉 首个正式版本</li>
+            <li>&#127881; 首个正式版本</li>
             <li>多 Agent 协作平台（顺序/层级/圆桌）</li>
             <li>支持 9+ AI 模型供应商</li>
             <li>Skills 技能市场</li>
@@ -282,8 +459,8 @@ npm run dev</code></pre>
 
     <section class="cta reveal">
       <h2>开始使用 Flowith</h2>
-      <p>免费开源，支持 macOS 和 Windows</p>
-      <a class="cta-btn" href="https://github.com/yuelangmanle/flowith/releases/download/v1.1.1/Flowith_1.1.1_aarch64.dmg">
+      <p>免费开源，支持 macOS、Windows，Android 即将推出</p>
+      <a class="cta-btn" id="cta-download" href="https://github.com/yuelangmanle/flowith/releases/download/v1.1.1/Flowith_1.1.1_aarch64.dmg">
         &#11015; 立即下载
       </a>
     </section>
@@ -300,21 +477,98 @@ npm run dev</code></pre>
   </footer>
 
   <script>
-    // Scroll reveal
+    // ─── Scroll reveal ───
     const io = new IntersectionObserver((entries) => {
       entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); } });
     }, { threshold: 0.1 });
     document.querySelectorAll('.reveal').forEach(el => io.observe(el));
 
-    // Platform filter
-    function showPlatform(platform) {
+    // ─── Platform filter ───
+    function showPlatform(platform, ev) {
       document.querySelectorAll('.platform-tab').forEach(t => t.classList.remove('active'));
-      event.target.classList.add('active');
+      if (ev && ev.target) ev.target.classList.add('active');
       document.querySelectorAll('.dl-card').forEach(card => {
         const p = card.dataset.platform;
         card.style.display = (platform === 'all' || p === platform) ? '' : 'none';
       });
     }
+
+    // ─── Install guide toggle ───
+    function toggleInstall(header) {
+      header.parentElement.classList.toggle('open');
+    }
+
+    // ─── Dynamic GitHub Release Fetching ───
+    const REPO = 'yuelangmanle/flowith';
+    const FALLBACK_VERSION = 'v1.1.1';
+
+    async function loadLatestRelease() {
+      try {
+        const resp = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`);
+        if (!resp.ok) return;
+        const release = await resp.json();
+        const version = release.tag_name;
+        if (!version) return;
+
+        // Update hero badge version
+        const heroVer = document.getElementById('hero-version');
+        if (heroVer) heroVer.textContent = version;
+
+        // Update all download links with data-pattern attribute
+        document.querySelectorAll('[data-pattern]').forEach(card => {
+          const pattern = card.dataset.pattern;
+          if (pattern) {
+            const filename = pattern.replace('{V}', version);
+            card.href = `https://github.com/${REPO}/releases/download/${version}/${filename}`;
+          }
+        });
+
+        // Update CTA button
+        const cta = document.getElementById('cta-download');
+        if (cta) {
+          cta.href = `https://github.com/${REPO}/releases/download/${version}/Flowith_${version}_aarch64.dmg`;
+        }
+      } catch (e) {
+        console.warn('Failed to fetch latest release:', e);
+      }
+    }
+
+    async function loadAllReleases() {
+      try {
+        const resp = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=10`);
+        if (!resp.ok) return;
+        const releases = await resp.json();
+        if (!Array.isArray(releases) || releases.length === 0) return;
+
+        const container = document.getElementById('changelog-list');
+        if (!container) return;
+
+        container.innerHTML = releases.map(r => {
+          const version = r.tag_name;
+          const date = r.published_at ? new Date(r.published_at).toISOString().split('T')[0] : '';
+          const body = r.body || '';
+          // Parse body into list items (lines starting with - or *)
+          const items = body.split('\n')
+            .map(l => l.trim())
+            .filter(l => l.startsWith('-') || l.startsWith('*'))
+            .map(l => l.replace(/^[-*]\s*/, ''))
+            .slice(0, 8);
+
+          if (items.length === 0) return '';
+
+          return `<div class="changelog-item">
+            <div class="cl-header"><span class="cl-version">${version}</span><span class="cl-date">${date}</span></div>
+            <ul>${items.map(i => `<li>${i}</li>`).join('')}</ul>
+          </div>`;
+        }).filter(Boolean).join('');
+      } catch (e) {
+        console.warn('Failed to fetch releases:', e);
+      }
+    }
+
+    // Run on page load
+    loadLatestRelease();
+    loadAllReleases();
   </script>
 </body>
 </html>

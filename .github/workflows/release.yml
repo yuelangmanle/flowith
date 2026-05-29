@@ -67,6 +67,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Publish updater JSON
         run: |
           TAG="${{ github.ref_name }}"
@@ -95,3 +96,18 @@ jobs:
           EOF
           echo "Updater JSON:"
           cat latest.json
+
+      - name: Update download page fallback version
+        run: |
+          TAG="${{ github.ref_name }}"
+          # Update FALLBACK_VERSION in the download page JS
+          sed -i "s|const FALLBACK_VERSION = 'v[0-9.]*';|const FALLBACK_VERSION = '${TAG}';|g" docs/download/index.html
+          # Update static fallback download links (data-pattern cards have dynamic JS, but hero badge and CTA have static fallback)
+          sed -i "s|id=\"hero-version\">v[0-9.]*<|id=\"hero-version\">${TAG}<|g" docs/download/index.html
+          echo "Updated download page fallback to ${TAG}"
+
+      - name: Commit download page update
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "docs: update download page fallback version to ${{ github.ref_name }}"
+          file_pattern: 'docs/download/index.html'

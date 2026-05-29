@@ -1,5 +1,7 @@
 // ─── Shared utilities used across all views ────────────────────
 
+import { getAdapter } from "./apiAdapter";
+
 export const API_BASE =
   window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
     ? `http://${window.location.hostname}:8787`
@@ -19,14 +21,10 @@ export function formatTime(iso: string): string {
 }
 
 export async function apiFetch(path: string, options?: RequestInit): Promise<Response> {
-  return fetch(`${API_BASE}${path}`, {
-    ...options,
-    headers: { "Content-Type": "application/json", ...options?.headers },
-  });
+  return getAdapter().fetch(path, options);
 }
 
 export function getProviderIcon(type: string): string {
-  // Returns a short label used as fallback; prefer getProviderIconComponent for rendering
   const icons: Record<string, string> = {
     openai: "AI", anthropic: "CL", gemini: "GM", deepseek: "DS",
     qwen: "QN", moonshot: "MS", ollama: "OL", "openai-compatible": "AI",

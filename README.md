@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  多种模型 · 圆桌讨论 · 代码生成 · 技能管理 · Token 优化
+  多种模型 · 圆桌讨论 · 代码生成 · 技能管理 · Token 优化 · 安卓支持
 </p>
 
 <p align="center">
@@ -67,6 +67,7 @@
 前往 **[精美下载页](https://yuelangmanle.github.io/flowith/)** 下载，或直接点击：
 
 | 平台 | 下载 |
+| Android | [即将推出](https://github.com/yuelangmanle/flowith/releases) |
 |------|------|
 | macOS (Apple Silicon) | [Flowith_1.0.0_aarch64.dmg](https://github.com/yuelangmanle/flowith/releases/download/v1.0.0/Flowith_1.0.0_aarch64.dmg) |
 | Windows | [Releases 页面](https://github.com/yuelangmanle/flowith/releases) |
