@@ -83,8 +83,13 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Install Android SDK components
+        run: |
+          sdkmanager --install "platform-tools" "platforms;android-36" "build-tools;36.0.0" 2>&1 | tail -5
+          echo "SDK components installed"
+
       - name: Accept Android SDK licenses
-        run: yes | sdkmanager --licenses || true
+        run: yes | sdkmanager --licenses 2>&1 | tail -5
 
       - name: Install dependencies
         run: npm ci
@@ -93,14 +98,20 @@ jobs:
         run: npx vite build
 
       - name: Sync Capacitor Android
-        run: npx cap sync android
+        run: |
+          echo "=== Capacitor Sync ==="
+          npx cap sync android --verbose 2>&1
+          echo "=== Sync Complete ==="
 
       - name: Make Gradlew executable
         run: chmod +x android/gradlew
 
       - name: Build Android APK
         working-directory: android
-        run: ./gradlew assembleDebug
+        run: |
+          echo "=== Building APK ==="
+          ./gradlew assembleDebug --stacktrace 2>&1 | tail -20
+          echo "=== Build Complete ==="
 
       - name: Prepare APK for release
         run: |
@@ -119,6 +130,7 @@ jobs:
 
   publish-updater:
     needs: [build, build-android]
+    if: always() && needs.build.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
