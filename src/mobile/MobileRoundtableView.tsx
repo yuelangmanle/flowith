@@ -68,24 +68,12 @@ export function MobileRoundtableView() {
         signal: controller.signal,
       });
 
-      const reader = resp.body?.getReader();
-      if (!reader) { setRunning(false); return; }
-
-      const decoder = new TextDecoder();
-      let buffer = "";
+      // Parse SSE response - handle both streaming and buffered responses
       let eventType = "";
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-
-        for (const line of lines) {
-          if (line.startsWith("event: ")) { eventType = line.slice(7).trim(); continue; }
-          if (line.startsWith("data: ")) {
+      const processSSELine = (line: string) => {
+        if (line.startsWith("event: ")) { eventType = line.slice(7).trim(); return; }
+        if (line.startsWith("data: ")) {
             try {
               const data = JSON.parse(line.slice(6));
               if (eventType === "text" && data.content) {
@@ -116,8 +104,25 @@ export function MobileRoundtableView() {
                 setRunning(false);
               }
             } catch {}
-          }
         }
+      };
+
+      const reader = resp.body?.getReader();
+      if (reader) {
+        const decoder = new TextDecoder();
+        let buffer = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const parts = buffer.split("\n");
+          buffer = parts.pop() ?? "";
+          parts.forEach(processSSELine);
+        }
+        if (buffer.trim()) processSSELine(buffer);
+      } else {
+        const text = await resp.text();
+        text.split("\n").forEach(processSSELine);
       }
     } catch (err: unknown) {
       if (err instanceof Error && err.name === "AbortError") {

@@ -60,25 +60,51 @@ class DirectApiAdapter implements ApiAdapter {
     // Streaming endpoints: return SSE ReadableStream response
     const streamingPaths = ["/api/chat", "/api/roundtable", "/api/orchestrate/sequential", "/api/orchestrate/hierarchical", "/api/codegen"];
     if (streamingPaths.includes(path) && this.streamRouteHandler) {
-      const encoder = new TextEncoder();
-      const stream = new ReadableStream({
-        start: async (controller) => {
-          try {
-            for await (const event of this.streamRouteHandler!(path, body)) {
-              const sseData = `event: ${event.type}\ndata: ${JSON.stringify(event.data)}\n\n`;
-              controller.enqueue(encoder.encode(sseData));
+      try {
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream({
+          start: async (controller) => {
+            try {
+              for await (const event of this.streamRouteHandler!(path, body)) {
+                try {
+                  const sseData = `event: ${event.type}\ndata: ${JSON.stringify(event.data)}\n\n`;
+                  controller.enqueue(encoder.encode(sseData));
+                } catch (encodeErr) {
+                  console.error("[Mobile] SSE encode error:", encodeErr);
+                }
+              }
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : String(err);
+              console.error("[Mobile] Stream handler error:", msg);
+              try {
+                controller.enqueue(encoder.encode(`event: error\ndata: ${JSON.stringify({ error: msg })}\n\n`));
+              } catch {}
             }
-          } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
-            controller.enqueue(encoder.encode(`event: error\ndata: ${JSON.stringify({ error: msg })}\n\n`));
+            try { controller.close(); } catch {}
+          },
+        });
+        return new Response(stream, {
+          status: 200,
+          headers: { "content-type": "text/event-stream", "cache-control": "no-cache" },
+        });
+      } catch (streamErr) {
+        // Fallback: if ReadableStream fails, collect all events into a single response
+        console.warn("[Mobile] ReadableStream failed, using fallback:", streamErr);
+        const events: Array<{type: string; data: unknown}> = [];
+        try {
+          for await (const event of this.streamRouteHandler!(path, body)) {
+            events.push(event);
           }
-          controller.close();
-        },
-      });
-      return new Response(stream, {
-        status: 200,
-        headers: { "content-type": "text/event-stream", "cache-control": "no-cache" },
-      });
+        } catch (err) {
+          events.push({ type: "error", data: { error: err instanceof Error ? err.message : String(err) } });
+        }
+        // Return as SSE text so client can parse it
+        const sseBody = events.map(e => `event: ${e.type}\ndata: ${JSON.stringify(e.data)}\n\n`).join("");
+        return new Response(sseBody, {
+          status: 200,
+          headers: { "content-type": "text/event-stream", "cache-control": "no-cache" },
+        });
+      }
     }
 
     // Non-streaming endpoints

@@ -36,7 +36,12 @@ export function MessageRenderer({
   processedContent = processedContent.replace(/\[思考\]([\s\S]*?)\[\/思考\]/g, "<think>$1</think>");
 
   // First pass: merge adjacent <think> blocks (streaming sends many small blocks)
-  processedContent = processedContent.replace(/<\/think>\s*<think>>/g, "\n");
+  // Repeatedly merge until no more adjacent blocks exist
+  let prev = "";
+  while (prev !== processedContent) {
+    prev = processedContent;
+    processedContent = processedContent.replace(/<\/think>[\s\n]*<think>>/g, "\n");
+  }
 
   const thinkingParts = processedContent.split(/(<think>[\s\S]*?<\/think>)/g);
   const thinkingBlocks: string[] = [];

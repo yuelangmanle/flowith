@@ -8,29 +8,37 @@ interface Props {
 
 export function ThinkingBlock({ content, defaultExpanded = false }: Props) {
   const [expanded, setExpanded] = useState(defaultExpanded);
-  // Clean up fragmented thinking text (2-3 chars per line from streaming)
+  // Clean up fragmented thinking text (streaming sends tiny chunks)
   const cleanedContent = (() => {
-    const lines = content.split("\n");
-    if (lines.length > 3) {
-      const avgLen = lines.reduce((sum, l) => sum + l.trim().length, 0) / lines.length;
-      if (avgLen < 20) {
-        // Short lines - likely fragmented streaming output, join into paragraphs
-        const joined = lines.map(l => l.trim()).filter(Boolean).join("");
-        // Re-wrap at ~80 chars for readability
+    // Normalize line endings
+    let text = content.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+    // Remove <think>/ closing tags that leaked through
+    text = text.replace(/<\/think>/g, "").replace(/<think>/g, "");
+    
+    const lines = text.split("\n");
+    // Always attempt cleanup if we have many short lines (fragmented streaming)
+    const nonEmpty = lines.filter(l => l.trim().length > 0);
+    if (nonEmpty.length > 2) {
+      const avgLen = nonEmpty.reduce((sum, l) => sum + l.trim().length, 0) / nonEmpty.length;
+      if (avgLen < 30) {
+        // Fragmented output - join all text and re-wrap
+        const joined = nonEmpty.map(l => l.trim()).join("");
+        if (joined.length === 0) return "";
+        // Re-wrap at ~80 chars, breaking at sentence/clause boundaries
         const result: string[] = [];
         let current = "";
         for (const ch of joined) {
           current += ch;
-          if (current.length >= 80 && /[,，。.!！?？;；\s]/.test(ch)) {
-            result.push(current);
+          if (current.length >= 60 && /[，。！？；：,.!?;:\s]/.test(ch)) {
+            result.push(current.trim());
             current = "";
           }
         }
-        if (current) result.push(current);
+        if (current.trim()) result.push(current.trim());
         return result.join("\n");
       }
     }
-    return content;
+    return text;
   })();
   const charCount = cleanedContent.length;
 

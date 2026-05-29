@@ -604,7 +604,10 @@ export function SettingsView() {
       </div>
 
       {/* Auto-update */}
-      <UpdateChecker currentVersion="1.3.1" platform="mac" />
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <UpdateChecker currentVersion="1.3.2" platform="mac" />
+        <UpdateChecker currentVersion="1.3.2" platform="mac" mode="compact" />
+      </div>
 
       {/* Changelog */}
       <ChangelogSection />
@@ -617,6 +620,28 @@ export function SettingsView() {
 function ChangelogSection() {
   const [expanded, setExpanded] = useState(false);
   const versions = [
+    {
+      version: "v1.3.2",
+      date: "2026-05-29",
+      changes: [
+        "🔧 修复 MiMo web search 参数冲突",
+        "🧠 修复思考过程碎片化显示（合并相邻 think 块）",
+        "🐛 修复记忆页面 o.l1.map 崩溃",
+        "📱 修复手机端对话和模型发现",
+        "🔑 Android 统一签名 + 版本号对齐",
+        "🔄 支持 reasoning 字段（非 DeepSeek 模型思考）",
+      ],
+    },
+    {
+      version: "v1.3.1",
+      date: "2026-05-29",
+      changes: [
+        "🔧 MiMo API web search 参数修复",
+        "🧠 思考过程显示优化",
+        "📱 移动端 API 路由修复",
+        "🔄 自动更新检查功能",
+      ],
+    },
     {
       version: "v1.3.0",
       date: "2026-05-29",
@@ -669,7 +694,7 @@ function ChangelogSection() {
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 16 }}>📋</span>
           <span style={{ fontSize: 14, fontWeight: 600 }}>更新日志</span>
-          <span style={{ fontSize: 11, color: "var(--text-muted)", background: "var(--bg)", padding: "2px 8px", borderRadius: 4 }}>v1.3.0</span>
+          <span style={{ fontSize: 11, color: "var(--text-muted)", background: "var(--bg)", padding: "2px 8px", borderRadius: 4 }}>v1.3.2</span>
         </div>
         <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{expanded ? "收起" : "展开"}</span>
       </div>

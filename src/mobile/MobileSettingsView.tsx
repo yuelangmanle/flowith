@@ -564,8 +564,9 @@ export function MobileSettingsView() {
         </div>
 
         {/* ─── Auto-update ─── */}
-        <div style={{ marginBottom: 20 }}>
-          <UpdateChecker currentVersion="1.3.1" platform="android" />
+        <div style={{ marginBottom: 20, display: "flex", alignItems: "center", gap: 8 }}>
+          <UpdateChecker currentVersion="1.3.2" platform="android" />
+          <UpdateChecker currentVersion="1.3.2" platform="android" mode="compact" />
         </div>
 
         {/* ─── Token Stats ─── */}
@@ -664,6 +665,18 @@ function StatCard({ label, value, color }: { label: string; value: string; color
 // ─── Data ───────────────────────────────────────────────────────
 
 const changelog = [
+  {
+    version: "v1.3.2",
+    date: "2026-05-29",
+    changes: [
+      "🔧 修复 MiMo web search 参数冲突",
+      "🧠 修复思考过程碎片化显示",
+      "🐛 修复记忆页面崩溃",
+      "📱 修复手机端对话和模型发现",
+      "🔑 Android 统一签名 + 版本号对齐",
+      "🔄 支持 reasoning 字段（多模型思考）",
+    ],
+  },
   {
     version: "v1.3.1",
     date: "2026-05-29",

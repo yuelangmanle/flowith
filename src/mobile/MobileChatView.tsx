@@ -366,22 +366,12 @@ export function MobileChatView() {
         signal: controller.signal,
       });
 
-      const reader = resp.body?.getReader();
-      if (!reader) { setStreaming(false); return; }
-
-      const decoder = new TextDecoder();
+      // Parse SSE response - handle both streaming and buffered responses
       let full = "";
-      let buffer = "";
       let eventType = "";
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-
+      const processSSEText = (text: string) => {
+        const lines = text.split("\n");
         for (const line of lines) {
           if (line.startsWith("event: ")) { eventType = line.slice(7).trim(); continue; }
           if (line.startsWith("data: ")) {
@@ -423,6 +413,28 @@ export function MobileChatView() {
             } catch {}
           }
         }
+      };
+
+      // Read the response stream
+      const reader = resp.body?.getReader();
+      if (reader) {
+        // Streaming mode - read chunks as they arrive
+        const decoder = new TextDecoder();
+        let buffer = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const parts = buffer.split("\n");
+          buffer = parts.pop() ?? "";
+          processSSEText(parts.join("\n"));
+        }
+        // Process any remaining buffer
+        if (buffer.trim()) processSSEText(buffer);
+      } else {
+        // Fallback: read entire response as text
+        const text = await resp.text();
+        processSSEText(text);
       }
     } catch (err: unknown) {
       if (err instanceof Error && err.name === "AbortError") {
