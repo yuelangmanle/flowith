@@ -105,6 +105,16 @@ async function loadFromDisk() {
     const saved = JSON.parse(raw);
     if (Array.isArray(saved)) installedSkills = saved;
   } catch { /* no skills saved yet */ }
+
+  try {
+    const raw = await readFile(memoryFile, "utf8");
+    const saved = JSON.parse(raw) as MemoryStore;
+    if (saved && Array.isArray(saved.items)) {
+      memory.items = saved.items;
+      memory.l1Buffer = saved.l1Buffer ?? [];
+      memory.l2Buffer = saved.l2Buffer ?? [];
+    }
+  } catch { /* no memory saved yet */ }
 }
 
 async function loadTTSProvidersFromDisk() {
@@ -142,6 +152,12 @@ async function saveConversationsToDisk() {
     const list = Array.from(conversations.values());
     await fsWriteFile(conversationsFile, JSON.stringify(list, null, 2), "utf8");
   } catch { /* silently fail */ }
+}
+
+async function saveMemoryToDisk() {
+  try {
+    await fsWriteFile(memoryFile, JSON.stringify(memory, null, 2));
+  } catch {}
 }
 
 async function saveAgentsToDisk() {
@@ -634,12 +650,67 @@ export async function createServer() {
 
       // ─── Memory ──────────────────────────────────────
       if (request.method === "GET" && path === "/api/memory") {
-        return send(response, 200, { items: memory.items.length, l1: memory.l1Buffer.length, l2: memory.l2Buffer.length });
+        return send(response, 200, {
+          items: memory.items,
+          l1: memory.l1Buffer,
+          l2: memory.l2Buffer,
+          stats: {
+            totalItems: memory.items.length + memory.l1Buffer.length + memory.l2Buffer.length,
+            l1Count: memory.l1Buffer.length,
+            l2Count: memory.l2Buffer.length,
+            l3Count: memory.items.filter(m => m.layer === "L3-fact").length,
+            l4Count: memory.items.filter(m => m.layer === "L4-episodic").length,
+          }
+        });
       }
       if (request.method === "POST" && path === "/api/memory/query") {
         const body = await readJson(request) as { query: string; limit?: number };
         const results = queryMemory(memory, body.query, body.limit ?? 10);
         return send(response, 200, results);
+      }
+      if (request.method === "POST" && path === "/api/memory/add") {
+        const body = await readJson(request) as { content: string; type?: string; layer?: string; tags?: string[]; importance?: number };
+        const item = writeMemory(memory, {
+          type: (body.type as "fact" | "scenario") ?? "fact",
+          content: body.content,
+          source: {},
+          tags: body.tags ?? [],
+          importance: body.importance ?? 0.7,
+        });
+        await saveMemoryToDisk();
+        return send(response, 200, item);
+      }
+      if (request.method === "DELETE" && path.startsWith("/api/memory/")) {
+        const itemId = path.split("/").pop();
+        const idx = memory.items.findIndex(m => m.id === itemId);
+        if (idx >= 0) {
+          memory.items.splice(idx, 1);
+          await saveMemoryToDisk();
+          return send(response, 200, { ok: true });
+        }
+        const l1Idx = memory.l1Buffer.findIndex(m => m.id === itemId);
+        if (l1Idx >= 0) {
+          memory.l1Buffer.splice(l1Idx, 1);
+          await saveMemoryToDisk();
+          return send(response, 200, { ok: true });
+        }
+        const l2Idx = memory.l2Buffer.findIndex(m => m.id === itemId);
+        if (l2Idx >= 0) {
+          memory.l2Buffer.splice(l2Idx, 1);
+          await saveMemoryToDisk();
+          return send(response, 200, { ok: true });
+        }
+        return send(response, 404, { error: "Memory item not found" });
+      }
+      if (request.method === "DELETE" && path === "/api/memory/clear") {
+        const layer = url.searchParams.get("layer");
+        if (layer === "L1" || layer === "all") memory.l1Buffer = [];
+        if (layer === "L2" || layer === "all") memory.l2Buffer = [];
+        if (layer === "L3" || layer === "all") memory.items = memory.items.filter(m => m.layer !== "L3-fact");
+        if (layer === "L4" || layer === "all") memory.items = memory.items.filter(m => m.layer !== "L4-episodic");
+        if (!layer || layer === "all") { memory.items = []; memory.l1Buffer = []; memory.l2Buffer = []; }
+        await saveMemoryToDisk();
+        return send(response, 200, { ok: true });
       }
 
       // ─── Fallback Models ─────────────────────────────

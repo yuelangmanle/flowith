@@ -269,6 +269,7 @@ export async function* streamChatCompletion(
     model: req.model,
     messages: buildChatMessages(req.messages),
     stream: true,
+    stream_options: { include_usage: true },
   };
 
   // Provider-specific parameters
@@ -325,7 +326,7 @@ export async function* streamChatCompletion(
           // DeepSeek reasoning_content in streaming
           const rContent = (delta as Record<string, unknown>)?.reasoning_content as string | undefined;
           if (rContent) {
-            yield { type: "text", content: `[思考] ${rContent}\n[/思考]\n` };
+            reasoningBuffer += rContent;
           }
           if (chunk.usage) {
             yield {
@@ -439,6 +440,7 @@ function applyProviderParams(
       // MiMo web search tools — only add when explicitly enabled by user
       const mimoWebSearch = req.enableWebSearch === true || (req.enableWebSearch !== false && provider.webSearchEnabled === true);
       if (mimoWebSearch) {
+        body.webSearchEnabled = true;
         body.tools = [{
           type: "web_search",
           max_keyword: req.webSearchMaxKeyword ?? provider.webSearchMaxKeyword ?? 3,
@@ -613,7 +615,7 @@ async function* streamAnthropic(
               yield { type: "text", content: delta.text as string };
             }
             if (delta?.type === "thinking_delta" && delta.thinking) {
-              yield { type: "text", content: `[思考] ${delta.thinking}\n[/思考]\n` };
+              thinkingBuffer += delta.thinking as string;
             }
           }
           if (event.type === "message_delta") {
@@ -751,6 +753,7 @@ async function* streamGemini(
 
   const decoder = new TextDecoder();
   let buffer = "";
+  let geminiThinkingBuffer = "";
 
   try {
     while (true) {
@@ -772,8 +775,13 @@ async function* streamGemini(
           for (const part of chunk.candidates?.[0]?.content?.parts ?? []) {
             if (part.text) {
               if (part.thought) {
-                yield { type: "text", content: `[思考] ${part.text}\n[/思考]\n` };
+                geminiThinkingBuffer += part.text ?? "";
               } else {
+                // Flush thinking buffer before content
+                if (geminiThinkingBuffer) {
+                  yield { type: "text", content: `<think>${geminiThinkingBuffer}</think>` };
+                  geminiThinkingBuffer = "";
+                }
                 yield { type: "text", content: part.text };
               }
             }
@@ -786,6 +794,10 @@ async function* streamGemini(
     }
   } finally {
     reader.releaseLock();
+  }
+  // Flush remaining thinking buffer
+  if (geminiThinkingBuffer) {
+    yield { type: "text", content: `<think>${geminiThinkingBuffer}</think>` };
   }
   yield { type: "done" };
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState, Component, type ReactNode } from "react";
 import {
-  Bot, Code2, Download, FolderOpen, Loader2, MessageSquare, MessageSquarePlus, PackagePlus,
+  Bot, Code2, Database, Download, FolderOpen, Loader2, MessageSquare, MessageSquarePlus, PackagePlus,
   PanelLeftClose, PanelLeftOpen, Pin, Search, Settings, Trash2, Users,
 } from "lucide-react";
 import { useStore } from "./lib/store";
@@ -13,6 +13,7 @@ import { CodeGenView } from "./views/CodeGenView";
 import { ProjectsView } from "./views/ProjectsView";
 import { RightPanel } from "./views/RightPanel";
 import { SkillsView } from "./views/SkillsView";
+import { MemoryView } from "./views/MemoryView";
 import type { AgentTTSConfig, ModelConfig, Skill, TTSProviderConfig } from "./core/types";
 import { useKeyboard } from "./lib/useKeyboard";
 import { SunIcon, MoonIcon, BotIcon, UserIcon, ChatIcon } from "./components/icons";
@@ -186,6 +187,7 @@ export function App() {
                 <button className={`nav-item ${view === "projects" ? "active" : ""}`} onClick={() => setView("projects")}><FolderOpen size={16} /> 项目模板</button>
                 <button className={`nav-item ${view === "agents" ? "active" : ""}`} onClick={() => setView("agents")}><Bot size={16} /> Agent 管理</button>
                 <button className={`nav-item ${view === "skills" ? "active" : ""}`} onClick={() => setView("skills")}><PackagePlus size={16} /> Skills</button>
+                <button className={`nav-item ${view === "memory" ? "active" : ""}`} onClick={() => setView("memory")}><Database size={16} /> 记忆</button>
                 <button className={`nav-item ${view === "settings" ? "active" : ""}`} onClick={() => setView("settings")}><Settings size={16} /> 设置</button>
               </div>
               <div className="sidebar-section">对话历史</div>
@@ -228,6 +230,7 @@ export function App() {
             {view === "settings" && <SettingsView />}
             {view === "agents" && <AgentsView />}
             {view === "skills" && <SkillsView />}
+            {view === "memory" && <MemoryView />}
           </div>
           {rightPanelOpen && <RightPanel />}
         </div>

@@ -7,6 +7,7 @@ import { compressImage, formatBytes } from "../lib/imageCompress";
 import type { CompressResult } from "../lib/imageCompress";
 import type { ChatMessage } from "../core/types";
 import { UserIcon, BotIcon, BrainIcon, ZapIcon, EyeIcon, FileIcon, LinkIcon, ChatIcon } from "../components/icons";
+import { estimateTokens } from "../core/tokenCounter";
 
 export function ChatView() {
   const store = useStore();
@@ -409,6 +410,7 @@ export function ChatView() {
       const decoder = new TextDecoder();
       let buffer = "";
       let fullContent = "";
+      let lastUsage: { prompt: number; completion: number; cached: number } | null = null;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -428,16 +430,29 @@ export function ChatView() {
                 if (data.agentName) setStreamingAgent({ id: data.agentId, name: data.agentName, color: data.agentColor, avatar: data.agentAvatar ?? "✦" });
               } else if (currentEvent === "usage" && data.usage) {
                 // Track token usage from server SSE
+                const usageData = {
+                  prompt: data.usage.prompt ?? 0,
+                  completion: data.usage.completion ?? 0,
+                  cached: data.usage.cachedTokens ?? 0,
+                };
+                lastUsage = usageData;
                 if (activeConvId) {
-                  updateTokenUsage(activeConvId, {
-                    prompt: data.usage.prompt ?? 0,
-                    completion: data.usage.completion ?? 0,
-                    cached: data.usage.cachedTokens ?? 0,
-                  });
+                  updateTokenUsage(activeConvId, usageData);
                 }
               } else if (currentEvent === "error") throw new Error(data.error);
             } catch (e) { if (e instanceof SyntaxError) continue; throw e; }
           }
+        }
+      }
+
+      // Fallback: estimate tokens if provider didn't return usage data
+      if (!lastUsage && fullContent) {
+        const userMsgTokens = estimateTokens(chatInput);
+        const assistantTokens = estimateTokens(fullContent);
+        const estimatedUsage = { prompt: userMsgTokens, completion: assistantTokens, cached: 0 };
+        lastUsage = estimatedUsage;
+        if (activeConvId) {
+          updateTokenUsage(activeConvId, estimatedUsage);
         }
       }
 
@@ -446,6 +461,7 @@ export function ChatView() {
         id: uid(), role: "assistant", content: fullContent || "(无响应)",
         agentId: agent?.id, agentName: agent?.name, agentColor: agent?.color, agentAvatar: agent?.avatar,
         createdAt: new Date().toISOString(),
+        tokenUsage: lastUsage ? { prompt: lastUsage.prompt, completion: lastUsage.completion } : undefined,
       };
       const finalMessages = [...updatedMessages, assistantMsg];
       const finalConv = { ...updatedConv, messages: finalMessages, updatedAt: new Date().toISOString() };
@@ -621,8 +637,13 @@ export function ChatView() {
               </div>
               <div className="msg-time">{formatTime(msg.createdAt)}</div>
                 {msg.tokenUsage && (
-                  <div style={{ fontSize: 10, color: "var(--text-secondary)", opacity: 0.6, marginTop: 2 }}>
-                    ↑{msg.tokenUsage.prompt.toLocaleString()} ↓{msg.tokenUsage.completion.toLocaleString()} tokens
+                  <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 4, display: "flex", gap: 8, alignItems: "center" }}>
+                    <span style={{ padding: "1px 6px", borderRadius: 4, background: "var(--bg)", border: "1px solid var(--border)", fontSize: 10 }}>
+                      ↑{msg.tokenUsage.prompt.toLocaleString()} 输入
+                    </span>
+                    <span style={{ padding: "1px 6px", borderRadius: 4, background: "var(--bg)", border: "1px solid var(--border)", fontSize: 10 }}>
+                      ↓{msg.tokenUsage.completion.toLocaleString()} 输出
+                    </span>
                   </div>
                 )}
             </div>
@@ -663,6 +684,35 @@ export function ChatView() {
         )}
         <div ref={messagesEndRef} />
       </div>
+      {/* Token Usage Summary Bar */}
+      {convTokenUsage && (convTokenUsage.promptTokens > 0 || convTokenUsage.completionTokens > 0) && (
+        <div style={{
+          display: "flex", gap: 16, padding: "8px 20px", fontSize: 12,
+          color: "var(--text-secondary)", justifyContent: "center", flexWrap: "wrap",
+          borderTop: "1px solid var(--border)", background: "var(--bg-card)",
+        }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="3" y="12" width="4" height="9" rx="1" fill="currentColor" opacity="0.6"/><rect x="10" y="6" width="4" height="15" rx="1" fill="currentColor" opacity="0.8"/><rect x="17" y="3" width="4" height="18" rx="1" fill="currentColor"/></svg>
+            <span>输入 <strong>{convTokenUsage.promptTokens.toLocaleString()}</strong></span>
+          </span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M4 4h16a2 2 0 012 2v10a2 2 0 01-2 2H8l-4 4V6a2 2 0 012-2z" fill="currentColor"/></svg>
+            <span>输出 <strong>{convTokenUsage.completionTokens.toLocaleString()}</strong></span>
+          </span>
+          {convTokenUsage.cachedTokens > 0 && (
+            <span style={{ color: "#4ade80", display: "inline-flex", alignItems: "center", gap: 4 }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none"/><path d="M8 12l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>
+              缓存命中 <strong>{convTokenUsage.cachedTokens.toLocaleString()}</strong>
+            </span>
+          )}
+          {convTokenUsage.compressionSaved > 0 && (
+            <span style={{ color: "#94a3b8" }}>
+              压缩节省 <strong>{convTokenUsage.compressionSaved.toLocaleString()}</strong>
+            </span>
+          )}
+        </div>
+      )}
+
       <div className="chat-input-area">
         {(attachedImages.length > 0 || attachedFiles.length > 0) && (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8, padding: 8, borderRadius: 8, background: "var(--bg-card)", border: "1px solid var(--border)" }}>
