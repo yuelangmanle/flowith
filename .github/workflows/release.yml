@@ -78,7 +78,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
@@ -100,7 +100,7 @@ jobs:
       - name: Sync Capacitor Android
         run: |
           echo "=== Capacitor Sync ==="
-          npx cap sync android --verbose 2>&1
+          npx cap sync android 2>&1
           echo "=== Sync Complete ==="
 
       - name: Make Gradlew executable

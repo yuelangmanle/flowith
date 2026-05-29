@@ -1,0 +1,11 @@
+{
+  "appId": "com.flowith.app",
+  "appName": "Flowith",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "buildOptions": {}
+  }
+}
