@@ -112,7 +112,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd android
-          ./gradlew assembleDebug --no-daemon
+          ./gradlew assembleDebug --no-daemon -Dorg.gradle.java.home="$JAVA_HOME"
           echo "=== Build outputs ==="
           find app/build/outputs -type f -name "*.apk"
           APK=$(find app/build/outputs -name "*.apk" | head -1)
