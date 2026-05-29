@@ -8,7 +8,31 @@ interface Props {
 
 export function ThinkingBlock({ content, defaultExpanded = false }: Props) {
   const [expanded, setExpanded] = useState(defaultExpanded);
-  const charCount = content.length;
+  // Clean up fragmented thinking text (2-3 chars per line from streaming)
+  const cleanedContent = (() => {
+    const lines = content.split("\n");
+    if (lines.length > 3) {
+      const avgLen = lines.reduce((sum, l) => sum + l.trim().length, 0) / lines.length;
+      if (avgLen < 20) {
+        // Short lines - likely fragmented streaming output, join into paragraphs
+        const joined = lines.map(l => l.trim()).filter(Boolean).join("");
+        // Re-wrap at ~80 chars for readability
+        const result: string[] = [];
+        let current = "";
+        for (const ch of joined) {
+          current += ch;
+          if (current.length >= 80 && /[,，。.!！?？;；\s]/.test(ch)) {
+            result.push(current);
+            current = "";
+          }
+        }
+        if (current) result.push(current);
+        return result.join("\n");
+      }
+    }
+    return content;
+  })();
+  const charCount = cleanedContent.length;
 
   return (
     <div style={{
@@ -42,7 +66,7 @@ export function ThinkingBlock({ content, defaultExpanded = false }: Props) {
           maxHeight: 500, overflow: "auto",
           fontFamily: "var(--font)",
         }}>
-          {content}
+          {cleanedContent}
         </div>
       )}
     </div>

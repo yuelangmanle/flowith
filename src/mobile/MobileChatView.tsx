@@ -353,6 +353,7 @@ export function MobileChatView() {
         conversationId: convId, message: msg,
         agentId: selectedAgentId || undefined,
         providerId: provider.id,
+        model: effectiveModel?.id,
       };
       if (userMsg.imageData) body.imageData = userMsg.imageData;
       if (userMsg.additionalImages) body.additionalImages = userMsg.additionalImages;

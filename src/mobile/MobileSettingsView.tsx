@@ -113,15 +113,41 @@ function ProviderCard({
             />
           </div>
 
-          {/* Alt URL (MiMo) */}
-          {provider.altBaseUrl !== undefined && (
+          {/* MiMo URL Configuration */}
+          {provider.type === "xiaomi-mimo" && (
             <div style={{ marginBottom: 10 }}>
-              <label style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 4, display: "block" }}>备用 URL</label>
+              <label style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 4, display: "block" }}>API 地址</label>
               <input
-                value={provider.altBaseUrl}
-                onChange={(e) => onUpdate((p) => ({ ...p, altBaseUrl: e.target.value }))}
+                value={provider.altBaseUrl || provider.baseUrl}
+                placeholder="https://api.xiaomimimo.com/v1"
+                onChange={(e) => {
+                  const v = e.target.value.trim();
+                  if (v.includes("token-plan-cn")) {
+                    onUpdate((p) => ({ ...p, baseUrl: "https://api.xiaomimimo.com/v1", altBaseUrl: v }));
+                  } else {
+                    onUpdate((p) => ({ ...p, baseUrl: v || "https://api.xiaomimimo.com/v1", altBaseUrl: undefined }));
+                  }
+                }}
                 style={inputStyle}
               />
+              <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+                {[["https://api.xiaomimimo.com/v1", "标准"], ["https://token-plan-cn.xiaomimimo.com/v1", "Token Plan CN"]].map(([url, label]) => (
+                  <button key={url} onClick={() => {
+                    if (url.includes("token-plan-cn")) {
+                      onUpdate((p) => ({ ...p, baseUrl: "https://api.xiaomimimo.com/v1", altBaseUrl: url }));
+                    } else {
+                      onUpdate((p) => ({ ...p, baseUrl: url, altBaseUrl: undefined }));
+                    }
+                  }} style={{
+                    fontSize: 11, padding: "4px 10px", borderRadius: 6,
+                    border: "1px solid var(--border)",
+                    background: (provider.altBaseUrl || provider.baseUrl) === url ? "rgba(14,165,233,0.15)" : "var(--bg-card)",
+                    cursor: "pointer", color: "var(--text-primary)",
+                  }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
@@ -539,7 +565,7 @@ export function MobileSettingsView() {
 
         {/* ─── Auto-update ─── */}
         <div style={{ marginBottom: 20 }}>
-          <UpdateChecker currentVersion="1.3.0" platform="android" />
+          <UpdateChecker currentVersion="1.3.1" platform="android" />
         </div>
 
         {/* ─── Token Stats ─── */}

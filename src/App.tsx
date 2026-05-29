@@ -14,7 +14,7 @@ import { ProjectsView } from "./views/ProjectsView";
 import { RightPanel } from "./views/RightPanel";
 import { SkillsView } from "./views/SkillsView";
 import { MemoryView } from "./views/MemoryView";
-import type { AgentTTSConfig, ModelConfig, Skill, TTSProviderConfig } from "./core/types";
+import type { AgentTTSConfig, ModelConfig, ProviderConfig, Skill, TTSProviderConfig } from "./core/types";
 import { useKeyboard } from "./lib/useKeyboard";
 import { SunIcon, MoonIcon, BotIcon, UserIcon, ChatIcon } from "./components/icons";
 import { SetupWizard } from "./views/SetupWizard";
@@ -117,7 +117,16 @@ export function App() {
       } catch {}
 
       // Discover models for enabled providers
-      for (const p of providers.filter((pp) => pp.enabled && (pp.apiKey || pp.type === "ollama"))) {
+      // Re-fetch providers from API to ensure we have latest (closure may have stale data)
+      let freshProviders = providers;
+      try {
+        const fpResp = await apiFetch("/api/providers");
+        if (fpResp.ok) {
+          const fpData = await fpResp.json();
+          if (Array.isArray(fpData) && fpData.length > 0) freshProviders = fpData;
+        }
+      } catch {}
+      for (const p of freshProviders.filter((pp: ProviderConfig) => pp.enabled && (pp.apiKey || pp.type === "ollama"))) {
         try {
           const resp = await apiFetch("/api/providers/discover", { method: "POST", body: JSON.stringify({ providerId: p.id }) });
           if (resp.ok) {

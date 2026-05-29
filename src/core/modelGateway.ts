@@ -269,8 +269,12 @@ export async function* streamChatCompletion(
     model: req.model,
     messages: buildChatMessages(req.messages),
     stream: true,
-    stream_options: { include_usage: true },
   };
+
+  // stream_options only for providers that support it (OpenAI, DeepSeek)
+  if (provider.type === "openai" || provider.type === "deepseek") {
+    bodyObj.stream_options = { include_usage: true };
+  }
 
   // Provider-specific parameters
   applyProviderParams(provider, req.model, bodyObj, req);
@@ -436,7 +440,7 @@ function applyProviderParams(
     case "xiaomi-mimo": {
       body.temperature = req.temperature ?? 0.7;
       body.max_tokens = req.maxTokens ?? inferMaxTokens(req.messages);
-      // MiMo web search — only add when user explicitly enables it
+      // MiMo web search — only add tools when explicitly enabled
       const mimoWebSearch = req.enableWebSearch === true || (req.enableWebSearch !== false && provider.webSearchEnabled === true);
       if (mimoWebSearch) {
         body.webSearchEnabled = true;
@@ -444,10 +448,9 @@ function applyProviderParams(
           type: "web_search",
           max_keyword: req.webSearchMaxKeyword ?? provider.webSearchMaxKeyword ?? 3,
         }];
-      } else {
-        // Explicitly disable web search to avoid API validation errors
-        body.webSearchEnabled = false;
       }
+      // When disabled: don't send webSearchEnabled or tools at all
+      // MiMo API rejects mismatched webSearchEnabled/tools presence
       break;
     }
 

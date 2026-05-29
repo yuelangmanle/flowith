@@ -186,7 +186,13 @@ export async function handlePutSkills(state: AppState, body: { skills: AppState[
 }
 
 export function handleGetMemory(state: AppState) {
-  return state.memory;
+  const stats = getMemoryStats(state.memory);
+  return {
+    items: state.memory.items,
+    l1: state.memory.l1Buffer,
+    l2: state.memory.l2Buffer,
+    stats,
+  };
 }
 
 export function handleMemoryQuery(state: AppState, body: { query: string; layer?: string; limit?: number }) {

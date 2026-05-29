@@ -11,7 +11,7 @@ import { MobileSetupWizard } from "./MobileSetupWizard";
 import { useStore } from "../lib/store";
 import { apiFetch } from "../lib/shared";
 import { bootstrapMobile } from "../lib/mobileBootstrap";
-import type { Skill } from "../core/types";
+import type { ModelConfig, ProviderConfig, Skill } from "../core/types";
 
 type TabId = "chat" | "roundtable" | "memory" | "skills" | "agents" | "codegen" | "settings";
 
@@ -59,6 +59,37 @@ export function MobileApp() {
           if (Array.isArray(data)) store.setSkills(data);
         }
       } catch {}
+
+      // Discover models for enabled providers
+      // Use API response directly (store.providers may not be updated yet)
+      let loadedProviders: ProviderConfig[] = [];
+      try {
+        const pResp = await apiFetch("/api/providers");
+        if (pResp.ok) {
+          const pData = await pResp.json();
+          if (Array.isArray(pData)) loadedProviders = pData;
+        }
+      } catch {}
+      if (loadedProviders.length === 0) loadedProviders = store.providers;
+      
+      const providersList = loadedProviders.filter((pp) => pp.enabled && (pp.apiKey || pp.type === "ollama"));
+      const allModels: ModelConfig[] = [];
+      for (const p of providersList) {
+        try {
+          const resp = await apiFetch("/api/providers/discover", { method: "POST", body: JSON.stringify({ providerId: p.id }) });
+          if (resp.ok) {
+            const data = await resp.json() as { models: ModelConfig[] };
+            if (data.models) allModels.push(...data.models);
+          }
+        } catch {}
+      }
+      if (allModels.length > 0) {
+        store.setModels((prev) => {
+          const existingIds = new Set(allModels.map(m => `${m.providerId}:${m.id}`));
+          const filtered = prev.filter(m => !existingIds.has(`${m.providerId}:${m.id}`));
+          return [...filtered, ...allModels];
+        });
+      }
 
       // Load TTS providers
       try {

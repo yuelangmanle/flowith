@@ -604,7 +604,7 @@ export function SettingsView() {
       </div>
 
       {/* Auto-update */}
-      <UpdateChecker currentVersion="1.3.0" platform="mac" />
+      <UpdateChecker currentVersion="1.3.1" platform="mac" />
 
       {/* Changelog */}
       <ChangelogSection />

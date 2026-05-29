@@ -64,8 +64,12 @@ export function MobileMemoryView() {
         apiFetch("/api/memory/stats"),
       ]);
       if (memResp.ok) {
-        const data = (await memResp.json()) as { items: MemoryItem[]; l1: MemoryItem[]; l2: MemoryItem[] };
-        setMemories({ items: data.items ?? [], l1: data.l1 ?? [], l2: data.l2 ?? [] });
+        const data = (await memResp.json()) as { items?: MemoryItem[]; l1?: MemoryItem[]; l2?: MemoryItem[] };
+        setMemories({
+          items: Array.isArray(data.items) ? data.items : [],
+          l1: Array.isArray(data.l1) ? data.l1 : [],
+          l2: Array.isArray(data.l2) ? data.l2 : [],
+        });
       }
       if (statsResp.ok) {
         setStats((await statsResp.json()) as MemoryStats);
