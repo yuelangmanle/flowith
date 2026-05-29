@@ -15,14 +15,14 @@
 
 ### 桌面应用（推荐）
 
-从 [Releases](https://github.com/YOUR_USERNAME/flowith/releases) 下载：
+从 [Releases](https://github.com/yuelangmanle/flowith/releases) 下载：
 - macOS: `Flowith_x.x.x_aarch64.dmg`
 - Windows: `Flowith_x.x.x_x64-setup.nsis.exe`
 
 ### 从源码运行
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/flowith.git
+git clone https://github.com/yuelangmanle/flowith.git
 cd flowith
 npm install
 npm run dev
