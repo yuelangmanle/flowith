@@ -602,7 +602,7 @@ export function ChatView() {
                     ))}
                   </div>
                 )}
-                {renderMessageContent(msg.content.replace(/\[图片已附加\]\s*/g, "").replace(/\[文件:[^\]]+\]\s*/g, "").replace(/<think>[\s\S]*?<\/think>/g, "").replace(/\[思考\][\s\S]*?\[\/思考\]/g, "").trim(), msg.id)}
+                {renderMessageContent(msg.content.replace(/\[图片已附加\]\s*/g, "").replace(/\[文件:[^\]]+\]\s*/g, "").trim(), msg.id)}
                 {msg.role === "assistant" && renderCitations(msg.content.replace(/<think>[\s\S]*?<\/think>/g, "").replace(/\[思考\][\s\S]*?\[\/思考\]/g, ""))}
                 {msg.role === "assistant" && (
                   <div style={{ display: "flex", gap: 4, marginTop: 4, alignItems: "center" }}>

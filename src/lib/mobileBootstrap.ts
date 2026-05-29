@@ -15,6 +15,7 @@ import {
   handlePutProviders,
   handleGetAgents,
   handleCreateAgent,
+  handleDeleteAgent,
   handleGetConversations,
   handlePutConversations,
   handleCreateConversation,
@@ -34,12 +35,18 @@ import {
   handleMemoryExport,
   handleMemoryImport,
   handleMemoryClear,
+  handleDeleteMemory,
   handleGetFallbackModels,
   handleTTS,
   handleChatStream,
   handleRoundtableStream,
   handleSequentialStream,
   handleHierarchicalStream,
+  handleTestProvider,
+  handleDiscoverModels,
+  handleInstallSkillGithub,
+  handleRefreshStars,
+  handleCodeGenStream,
   type AppState,
   type StreamEvent,
 } from "../core/apiHandlers";
@@ -178,6 +185,22 @@ async function routeHandler(path: string, method: string, body: unknown): Promis
   // TTS
   if (method === "POST" && path === "/api/tts") return handleTTS(s, b);
 
+  // Provider test & discover
+  if (method === "POST" && path === "/api/test-provider") return handleTestProvider(s, b);
+  if (method === "POST" && path.startsWith("/api/discover/")) return handleDiscoverModels(s, { providerId: path.split("/").pop()! });
+  if (method === "POST" && path === "/api/providers/test") return handleTestProvider(s, b);
+  if (method === "POST" && path === "/api/providers/discover") return handleDiscoverModels(s, b);
+
+  // Agent delete
+  if (method === "DELETE" && path.startsWith("/api/agents/")) return handleDeleteAgent(s, path.split("/").pop()!);
+
+  // Memory delete single
+  if (method === "DELETE" && path.startsWith("/api/memory/") && path !== "/api/memory/clear") return handleDeleteMemory(s, path.split("/").pop()!);
+
+  // Skills install & refresh
+  if (method === "POST" && path === "/api/skills/install-github") return handleInstallSkillGithub(s, b);
+  if (method === "POST" && path === "/api/skills/refresh-stars") return handleRefreshStars(s);
+
   throw new Error(`Unknown route: ${method} ${path}`);
 }
 
@@ -190,6 +213,7 @@ async function* streamRouteHandler(path: string, body: unknown): AsyncGenerator<
   else if (path === "/api/roundtable") yield* handleRoundtableStream(s, b);
   else if (path === "/api/orchestrate/sequential") yield* handleSequentialStream(s, b);
   else if (path === "/api/orchestrate/hierarchical") yield* handleHierarchicalStream(s, b);
+  else if (path === "/api/codegen") yield* handleCodeGenStream(s, b);
   else yield { type: "error", data: { error: `Unknown stream route: ${path}` } };
 }
 

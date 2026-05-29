@@ -58,7 +58,7 @@ class DirectApiAdapter implements ApiAdapter {
     }
 
     // Streaming endpoints: return SSE ReadableStream response
-    const streamingPaths = ["/api/chat", "/api/roundtable", "/api/orchestrate/sequential", "/api/orchestrate/hierarchical"];
+    const streamingPaths = ["/api/chat", "/api/roundtable", "/api/orchestrate/sequential", "/api/orchestrate/hierarchical", "/api/codegen"];
     if (streamingPaths.includes(path) && this.streamRouteHandler) {
       const encoder = new TextEncoder();
       const stream = new ReadableStream({

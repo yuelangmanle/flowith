@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { UpdateChecker } from "../components/UpdateChecker";
 import {
   Moon, Sun, Volume2, VolumeX, RefreshCw, ChevronDown, ChevronRight,
   ShieldCheck, Zap, Loader2, TestTube, Search,
@@ -536,6 +537,11 @@ export function MobileSettingsView() {
           </div>
         </div>
 
+        {/* ─── Auto-update ─── */}
+        <div style={{ marginBottom: 20 }}>
+          <UpdateChecker currentVersion="1.3.0" platform="android" />
+        </div>
+
         {/* ─── Token Stats ─── */}
         {(totalStats.prompt > 0 || totalStats.completion > 0) && (
           <div style={{ marginBottom: 20 }}>
@@ -589,7 +595,7 @@ export function MobileSettingsView() {
           }}>
             <span style={{ fontSize: 16 }}>📋</span>
             <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>更新日志</span>
-            <span style={{ fontSize: 11, color: "var(--text-muted)", background: "var(--bg-secondary)", padding: "2px 8px", borderRadius: 4, marginLeft: "auto" }}>v1.3.0</span>
+            <span style={{ fontSize: 11, color: "var(--text-muted)", background: "var(--bg-secondary)", padding: "2px 8px", borderRadius: 4, marginLeft: "auto" }}>v1.3.1</span>
             {showChangelog ? <ChevronDown size={16} style={{ color: "var(--text-muted)" }} /> : <ChevronRight size={16} style={{ color: "var(--text-muted)" }} />}
           </button>
           {showChangelog && (
@@ -632,6 +638,17 @@ function StatCard({ label, value, color }: { label: string; value: string; color
 // ─── Data ───────────────────────────────────────────────────────
 
 const changelog = [
+  {
+    version: "v1.3.1",
+    date: "2026-05-29",
+    changes: [
+      "修复 MiMo API web search 参数冲突",
+      "修复桌面端思考过程显示",
+      "修复手机端 API 连接",
+      "新增自动检查更新功能",
+      "移动端代码生成支持",
+    ],
+  },
   {
     version: "v1.3.0",
     date: "2026-05-29",

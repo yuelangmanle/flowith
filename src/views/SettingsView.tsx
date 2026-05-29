@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { UpdateChecker } from "../components/UpdateChecker";
 import { Moon, RefreshCw, ShieldCheck, Sun, Volume2, VolumeX, Zap } from "lucide-react";
 import { useStore } from "../lib/store";
 import { apiFetch, getProviderIcon } from "../lib/shared";
@@ -601,6 +602,9 @@ export function SettingsView() {
           </div>
         ))}
       </div>
+
+      {/* Auto-update */}
+      <UpdateChecker currentVersion="1.3.0" platform="mac" />
 
       {/* Changelog */}
       <ChangelogSection />

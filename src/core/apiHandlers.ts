@@ -433,3 +433,125 @@ export async function* handleHierarchicalStream(
     yield { type: "error", data: { error: err instanceof Error ? err.message : String(err) } };
   }
 }
+
+// ─── Provider Test & Discover ──────────────────────────────────
+
+export async function handleTestProvider(state: AppState, body: { providerId: string }) {
+  const provider = state.providers.find((p) => p.id === body.providerId);
+  if (!provider) return { ok: false, error: "Provider not found" };
+  const start = Date.now();
+  try {
+    const models = await discoverModels(provider);
+    return { ok: true, modelCount: models.length, latencyMs: Date.now() - start };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err), latencyMs: Date.now() - start };
+  }
+}
+
+export async function handleDiscoverModels(state: AppState, body: { providerId: string }) {
+  const provider = state.providers.find((p) => p.id === body.providerId);
+  if (!provider) throw new Error("Provider not found");
+  const models = await discoverModels(provider);
+  provider.modelsDiscovered = models.length;
+  if (state.saveProviders) await state.saveProviders();
+  return { models, count: models.length };
+}
+
+export function handleDeleteAgent(state: AppState, agentId: string) {
+  state.agents = state.agents.filter((a) => a.id !== agentId);
+  if (state.saveAgents) state.saveAgents();
+  return { ok: true };
+}
+
+export function handleDeleteMemory(state: AppState, memoryId: string) {
+  state.memory.items = state.memory.items.filter((m) => m.id !== memoryId);
+  state.memory.l1Buffer = state.memory.l1Buffer.filter((m) => m.id !== memoryId);
+  state.memory.l2Buffer = state.memory.l2Buffer.filter((m) => m.id !== memoryId);
+  if (state.saveMemory) state.saveMemory();
+  return { ok: true };
+}
+
+export async function handleInstallSkillGithub(state: AppState, body: { url: string }) {
+  // Simple GitHub skill installation - create a placeholder skill from URL
+  const urlParts = body.url.replace(/\/$/, "").split("/");
+  const repo = urlParts.slice(-2).join("/");
+  const skill: any = {
+    id: `github-${repo.replace("/", "-")}`,
+    name: urlParts[urlParts.length - 1],
+    nameZh: urlParts[urlParts.length - 1],
+    description: `Skill from ${repo}`,
+    descriptionZh: `来自 ${repo} 的技能`,
+    author: urlParts[urlParts.length - 2],
+    repo: body.url,
+    category: "custom",
+    categoryZh: "自定义",
+    installed: true,
+    source: "github",
+    capabilities: [],
+    useCases: [],
+    installedAt: new Date().toISOString(),
+  };
+  state.installedSkills = [...state.installedSkills.filter((s: any) => s.id !== skill.id), skill];
+  if (state.saveSkills) await state.saveSkills();
+  return { skill };
+}
+
+export async function handleRefreshStars(state: AppState) {
+  // In mobile mode, just return current skills
+  return { skills: state.installedSkills };
+}
+
+// ─── Code Generation Streaming ─────────────────────────────────
+
+export async function* handleCodeGenStream(
+  state: AppState,
+  body: { idea: string; techStack?: string; providerId?: string; model?: string }
+): AsyncGenerator<StreamEvent> {
+  const provider = state.providers.find((p) => p.id === body.providerId) ?? state.providers.find((p) => p.enabled && p.apiKey);
+  if (!provider) { yield { type: "error", data: { error: "No available provider" } }; return; }
+
+  const model = body.model ?? provider.defaultModel ?? getFallbackModels(provider)[0]?.id;
+  if (!model) { yield { type: "error", data: { error: "No model available" } }; return; }
+
+  // Simple codegen: send the idea to the model and stream the response
+  const messages = [
+    { role: "system", content: `你是一个全栈开发专家。用户会描述一个应用想法，你需要：
+1. 分析需求
+2. 设计架构
+3. 生成核心代码
+4. 编写测试
+5. 生成文档
+6. 代码审查
+
+技术栈：${body.techStack ?? "Vite + React + TypeScript"}
+
+请按阶段输出，每个阶段用 [阶段名] 标记。` },
+    { role: "user", content: body.idea },
+  ];
+
+  const phases = ["requirements", "design", "generation", "testing", "documentation", "review"];
+  let currentPhase = 0;
+
+  yield { type: "phase", data: { phase: phases[0] } };
+
+  try {
+    for await (const chunk of streamChatCompletion({ provider, model, messages })) {
+      if (chunk.type === "text" && chunk.content) {
+        const text = chunk.content;
+        yield { type: "message", data: { phase: phases[currentPhase], content: text, agentName: "AI 开发者" } };
+        // Simple phase detection
+        if (text.includes("[设计]") || text.includes("## 设计")) {
+          currentPhase = 1;
+          yield { type: "phase", data: { phase: phases[1] } };
+        } else if (text.includes("[生成]") || text.includes("## 代码") || text.includes("```")) {
+          currentPhase = 2;
+          yield { type: "phase", data: { phase: phases[2] } };
+        }
+      } else if (chunk.type === "error") {
+        yield { type: "error", data: { error: chunk.error } };
+      }
+    }
+  } catch (err) {
+    yield { type: "error", data: { error: err instanceof Error ? err.message : String(err) } };
+  }
+}
