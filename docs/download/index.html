@@ -11,7 +11,7 @@
     html{scroll-behavior:smooth}
     body{font-family:'Inter',system-ui,sans-serif;background:#050510;color:#e2e8f0;overflow-x:hidden;line-height:1.6}
 
-    /* ── Animated BG ── */
+    /* Animated BG */
     .bg{position:fixed;inset:0;z-index:0;overflow:hidden}
     .bg .orb{position:absolute;border-radius:50%;filter:blur(100px);opacity:.4;animation:float 20s ease-in-out infinite}
     .bg .orb:nth-child(1){width:600px;height:600px;background:#6366f1;top:-10%;left:-10%;animation-delay:0s}
@@ -19,16 +19,14 @@
     .bg .orb:nth-child(3){width:400px;height:400px;background:#a78bfa;top:40%;left:50%;animation-delay:-14s}
     @keyframes float{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(30px,-40px) scale(1.05)}66%{transform:translate(-20px,30px) scale(.95)}}
 
-    /* ── Grid overlay ── */
     .grid-overlay{position:fixed;inset:0;z-index:0;background-image:
       linear-gradient(rgba(99,102,241,.03) 1px,transparent 1px),
       linear-gradient(90deg,rgba(99,102,241,.03) 1px,transparent 1px);
       background-size:60px 60px}
 
-    /* ── Content ── */
     .wrap{position:relative;z-index:1;max-width:1000px;margin:0 auto;padding:0 24px}
 
-    /* ── Nav ── */
+    /* Nav */
     nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:16px 0;
       backdrop-filter:blur(20px);background:rgba(5,5,16,.6);border-bottom:1px solid rgba(255,255,255,.04)}
     nav .wrap{display:flex;align-items:center;justify-content:space-between}
@@ -38,8 +36,8 @@
     nav .links a{color:#94a3b8;text-decoration:none;font-size:14px;font-weight:500;transition:color .2s}
     nav .links a:hover{color:#fff}
 
-    /* ── Hero ── */
-    .hero{padding:160px 0 100px;text-align:center}
+    /* Hero */
+    .hero{padding:160px 0 80px;text-align:center}
     .hero-badge{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;border-radius:100px;
       background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.2);font-size:13px;color:#a5b4fc;margin-bottom:28px;
       animation:fadeUp .8s ease-out}
@@ -49,141 +47,187 @@
       background:linear-gradient(135deg,#fff 0%,#c7d2fe 40%,#a78bfa 70%,#818cf8 100%);
       -webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:20px;
       animation:fadeUp .8s ease-out .1s both}
-    .hero p{font-size:18px;color:#64748b;max-width:480px;margin:0 auto 48px;line-height:1.7;
+    .hero p{font-size:18px;color:#64748b;max-width:520px;margin:0 auto 48px;line-height:1.7;
       animation:fadeUp .8s ease-out .2s both}
     @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
 
-    /* ── Download cards ── */
-    .dl-cards{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:100px;
+    /* Download cards */
+    .dl-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;max-width:760px;margin:0 auto 60px;
       animation:fadeUp .8s ease-out .3s both}
-    .dl-card{position:relative;display:flex;align-items:center;gap:16px;padding:20px 28px;border-radius:16px;
-      text-decoration:none;color:#fff;transition:all .3s cubic-bezier(.4,0,.2,1);overflow:hidden;min-width:240px}
-    .dl-card::before{content:'';position:absolute;inset:0;border-radius:16px;padding:1px;
+    .dl-card{position:relative;display:flex;align-items:center;gap:14px;padding:18px 22px;border-radius:14px;
+      text-decoration:none;color:#fff;transition:all .3s cubic-bezier(.4,0,.2,1);overflow:hidden;
+      background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06)}
+    .dl-card::before{content:'';position:absolute;inset:0;border-radius:14px;padding:1px;
       background:linear-gradient(135deg,rgba(255,255,255,.1),rgba(255,255,255,.02));
       -webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);
       -webkit-mask-composite:xor;mask-composite:exclude}
-    .dl-card{background:rgba(255,255,255,.03)}
     .dl-card:hover{transform:translateY(-4px);box-shadow:0 20px 40px rgba(99,102,241,.15);
-      background:rgba(99,102,241,.08)}
+      background:rgba(99,102,241,.08);border-color:rgba(99,102,241,.2)}
     .dl-card.primary{background:linear-gradient(135deg,#6366f1,#7c3aed);border:none}
     .dl-card.primary::before{background:linear-gradient(135deg,rgba(255,255,255,.2),rgba(255,255,255,.05))}
     .dl-card.primary:hover{box-shadow:0 20px 40px rgba(99,102,241,.35)}
-    .dl-card .ic{font-size:32px;flex-shrink:0;width:48px;height:48px;display:flex;align-items:center;justify-content:center;
-      background:rgba(255,255,255,.08);border-radius:12px}
-    .dl-card .txt .name{font-size:15px;font-weight:600}
-    .dl-card .txt .meta{font-size:12px;color:rgba(255,255,255,.5);margin-top:2px}
+    .dl-card .ic{font-size:28px;flex-shrink:0;width:44px;height:44px;display:flex;align-items:center;justify-content:center;
+      background:rgba(255,255,255,.08);border-radius:10px}
+    .dl-card .txt .name{font-size:14px;font-weight:600}
+    .dl-card .txt .meta{font-size:11px;color:rgba(255,255,255,.5);margin-top:2px}
     .dl-card.primary .txt .meta{color:rgba(255,255,255,.7)}
+    .dl-card .badge-new{position:absolute;top:8px;right:8px;padding:2px 8px;border-radius:6px;
+      background:rgba(52,211,153,.2);color:#34d399;font-size:10px;font-weight:600}
 
-    /* ── Features ── */
+    /* Platform tabs */
+    .platform-tabs{display:flex;justify-content:center;gap:8px;margin-bottom:32px;
+      animation:fadeUp .8s ease-out .25s both}
+    .platform-tab{padding:8px 20px;border-radius:8px;border:1px solid rgba(255,255,255,.08);
+      background:rgba(255,255,255,.03);color:#94a3b8;font-size:13px;font-weight:500;cursor:pointer;transition:all .2s}
+    .platform-tab.active{background:rgba(99,102,241,.15);border-color:rgba(99,102,241,.3);color:#a5b4fc}
+    .platform-tab:hover{border-color:rgba(255,255,255,.15);color:#e2e8f0}
+
+    /* Sections */
+    section{padding:80px 0}
     .section-title{text-align:center;margin-bottom:48px}
-    .section-title h2{font-size:36px;font-weight:800;letter-spacing:-1px;color:#fff;margin-bottom:12px}
-    .section-title p{font-size:16px;color:#64748b}
-    .features{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:100px}
-    @media(max-width:768px){.features{grid-template-columns:1fr 1fr}}
-    @media(max-width:480px){.features{grid-template-columns:1fr}}
-    .feat{padding:28px;border-radius:16px;background:rgba(255,255,255,.02);
-      border:1px solid rgba(255,255,255,.05);transition:all .3s;cursor:default}
-    .feat:hover{background:rgba(99,102,241,.06);border-color:rgba(99,102,241,.15);transform:translateY(-3px)}
-    .feat .fi{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;
-      font-size:22px;margin-bottom:16px;background:rgba(99,102,241,.1)}
-    .feat h3{font-size:15px;font-weight:600;color:#e2e8f0;margin-bottom:8px}
-    .feat p{font-size:13px;color:#64748b;line-height:1.6}
+    .section-title h2{font-size:32px;font-weight:800;letter-spacing:-1px;margin-bottom:8px;
+      background:linear-gradient(135deg,#fff,#c7d2fe);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+    .section-title p{font-size:15px;color:#64748b}
 
-    /* ── Stats ── */
-    .stats{display:flex;gap:32px;justify-content:center;margin-bottom:100px;flex-wrap:wrap}
+    /* Features */
+    .features{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px}
+    .feat{padding:28px;border-radius:16px;background:rgba(255,255,255,.02);
+      border:1px solid rgba(255,255,255,.04);transition:all .3s}
+    .feat:hover{background:rgba(99,102,241,.05);border-color:rgba(99,102,241,.15);transform:translateY(-2px)}
+    .feat .fi{font-size:28px;margin-bottom:14px}
+    .feat h3{font-size:16px;font-weight:700;margin-bottom:8px;color:#e2e8f0}
+    .feat p{font-size:13px;color:#64748b;line-height:1.7}
+
+    /* Stats */
+    .stats{display:flex;justify-content:center;gap:48px;flex-wrap:wrap;padding:60px 0}
     .stat{text-align:center}
-    .stat .num{font-size:42px;font-weight:800;background:linear-gradient(135deg,#6366f1,#a78bfa);
+    .stat .num{font-size:40px;font-weight:900;background:linear-gradient(135deg,#6366f1,#a78bfa);
       -webkit-background-clip:text;-webkit-text-fill-color:transparent}
     .stat .label{font-size:13px;color:#64748b;margin-top:4px}
 
-    /* ── Tech ── */
-    .tech{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:100px}
-    .tech span{padding:8px 16px;border-radius:10px;font-size:13px;font-weight:500;
-      background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);color:#94a3b8;
-      transition:all .2s}
-    .tech span:hover{background:rgba(99,102,241,.1);border-color:rgba(99,102,241,.2);color:#c7d2fe}
+    /* Tech */
+    .tech{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;padding:40px 0}
+    .tech span{padding:6px 16px;border-radius:8px;background:rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.06);font-size:12px;color:#94a3b8;font-weight:500}
 
-    /* ── CTA ── */
-    .cta{text-align:center;padding:80px 0 100px}
-    .cta h2{font-size:32px;font-weight:800;color:#fff;margin-bottom:16px}
-    .cta p{font-size:16px;color:#64748b;margin-bottom:32px}
-    .cta-btn{display:inline-flex;align-items:center;gap:10px;padding:16px 36px;border-radius:14px;
-      background:linear-gradient(135deg,#6366f1,#7c3aed);color:#fff;text-decoration:none;
-      font-size:16px;font-weight:600;transition:all .3s;border:none;cursor:pointer}
-    .cta-btn:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(99,102,241,.3)}
+    /* Changelog */
+    .changelog-list{max-width:640px;margin:0 auto}
+    .changelog-item{padding:24px;border-radius:14px;background:rgba(255,255,255,.02);
+      border:1px solid rgba(255,255,255,.04);margin-bottom:16px;transition:all .3s}
+    .changelog-item:hover{border-color:rgba(99,102,241,.15)}
+    .cl-header{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+    .cl-version{padding:4px 12px;border-radius:6px;background:rgba(99,102,241,.15);
+      color:#a5b4fc;font-size:13px;font-weight:600}
+    .cl-date{font-size:12px;color:#64748b}
+    .changelog-item ul{list-style:none;padding:0}
+    .changelog-item li{font-size:13px;color:#94a3b8;line-height:2;padding-left:4px}
 
-    /* ── Footer ── */
-    footer{border-top:1px solid rgba(255,255,255,.05);padding:32px 0;text-align:center}
-    footer a{color:#6366f1;text-decoration:none;font-size:14px;margin:0 16px;transition:color .2s}
-    footer a:hover{color:#a78bfa}
-    footer .copy{font-size:13px;color:#334155;margin-top:12px}
+    /* CTA */
+    .cta{text-align:center;padding:80px 0}
+    .cta h2{font-size:28px;font-weight:800;margin-bottom:12px;color:#fff}
+    .cta p{font-size:15px;color:#64748b;margin-bottom:32px}
+    .cta-btn{display:inline-flex;align-items:center;gap:10px;padding:14px 36px;border-radius:12px;
+      background:linear-gradient(135deg,#6366f1,#7c3aed);color:#fff;font-size:15px;font-weight:600;
+      text-decoration:none;transition:all .3s;box-shadow:0 8px 24px rgba(99,102,241,.3)}
+    .cta-btn:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(99,102,241,.4)}
 
-    /* ── Scroll animations ── */
-    .reveal{opacity:0;transform:translateY(30px);transition:all .8s cubic-bezier(.4,0,.2,1)}
+    /* Footer */
+    footer{border-top:1px solid rgba(255,255,255,.04);padding:32px 0;text-align:center}
+    footer div{display:flex;justify-content:center;gap:24px;margin-bottom:12px}
+    footer a{color:#64748b;text-decoration:none;font-size:13px;transition:color .2s}
+    footer a:hover{color:#a5b4fc}
+    footer .copy{font-size:12px;color:#334155}
+
+    /* Reveal */
+    .reveal{opacity:0;transform:translateY(24px);transition:all .7s cubic-bezier(.4,0,.2,1)}
     .reveal.visible{opacity:1;transform:translateY(0)}
 
-    /* ── Changelog ── */
-    .changelog{padding:60px 0}
-    .changelog-list{max-width:700px;margin:0 auto}
-    .changelog-item{padding:20px 24px;margin-bottom:16px;border-radius:12px;background:rgba(255,255,255,.03);border:1px solid rgba(99,102,241,.1)}
-    .cl-header{display:flex;align-items:center;gap:12px;margin-bottom:10px}
-    .cl-version{font-size:14px;font-weight:700;color:#a78bfa}
-    .cl-date{font-size:12px;color:rgba(255,255,255,.4)}
-    .changelog-item ul{margin:0;padding-left:20px}
-    .changelog-item li{font-size:13px;color:rgba(255,255,255,.7);line-height:2}
+    /* Source run box */
+    .source-run{max-width:640px;margin:0 auto 60px;padding:20px 24px;border-radius:12px;
+      background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);
+      animation:fadeUp .8s ease-out .35s both}
+    .source-run summary{font-size:14px;font-weight:600;color:#94a3b8;cursor:pointer}
+    .source-run pre{margin-top:12px;padding:16px;border-radius:8px;background:rgba(0,0,0,.3);
+      font-family:'JetBrains Mono',monospace;font-size:13px;color:#a5b4fc;overflow-x:auto;line-height:1.8}
+    .source-run code{color:#e2e8f0}
   </style>
 </head>
 <body>
-  <div class="bg">
-    <div class="orb"></div><div class="orb"></div><div class="orb"></div>
-  </div>
+  <div class="bg"><div class="orb"></div><div class="orb"></div><div class="orb"></div></div>
   <div class="grid-overlay"></div>
 
   <nav>
     <div class="wrap">
       <a class="brand" href="#">
-        <img src="https://raw.githubusercontent.com/yuelangmanle/flowith/main/public/icon.svg" alt="">
+        <img src="https://raw.githubusercontent.com/yuelangmanle/flowith/main/public/icon.svg" alt="Flowith">
         Flowith
       </a>
       <div class="links">
         <a href="#features">功能</a>
         <a href="#changelog">更新日志</a>
         <a href="https://github.com/yuelangmanle/flowith">GitHub</a>
-        <a href="https://github.com/yuelangmanle/flowith/releases/latest">Releases</a>
       </div>
     </div>
   </nav>
 
   <div class="wrap">
     <section class="hero">
-      <div class="hero-badge"><span class="dot"></span> v1.1.0 更新</div>
+      <div class="hero-badge"><span class="dot"></span> v1.1.1 已发布 · macOS + Windows</div>
       <h1>Flowith</h1>
-      <p>多 AI Agent 协作工作平台。多种模型、圆桌讨论、代码生成、技能管理，让 AI 为你流动协作。</p>
-      <div class="dl-cards">
-        <a class="dl-card primary" href="https://github.com/yuelangmanle/flowith/releases/download/v1.1.0/Flowith_1.1.0_aarch64.dmg">
+      <p>多 AI Agent 智能协作平台。多个 AI 各司其职，圆桌讨论、顺序编排、层级协作，一站式完成复杂任务。</p>
+
+      <div class="platform-tabs">
+        <span class="platform-tab active" onclick="showPlatform('all')">全部平台</span>
+        <span class="platform-tab" onclick="showPlatform('mac')">macOS</span>
+        <span class="platform-tab" onclick="showPlatform('win')">Windows</span>
+        <span class="platform-tab" onclick="showPlatform('src')">源码</span>
+      </div>
+
+      <div class="dl-grid" id="dl-grid">
+        <a class="dl-card primary" href="https://github.com/yuelangmanle/flowith/releases/download/v1.1.1/Flowith_1.1.1_aarch64.dmg" data-platform="mac">
           <span class="ic">&#127822;</span>
-          <span class="txt"><span class="name">macOS 版</span><span class="meta">Apple Silicon · ~6 MB</span></span>
+          <span class="txt"><span class="name">macOS Apple Silicon</span><span class="meta">DMG · ~6 MB</span></span>
+          <span class="badge-new">推荐</span>
         </a>
-        <a class="dl-card" href="https://github.com/yuelangmanle/flowith/releases/latest">
+        <a class="dl-card" href="https://github.com/yuelangmanle/flowith/releases/download/v1.1.1/Flowith_1.1.1_x64.dmg" data-platform="mac">
+          <span class="ic">&#127822;</span>
+          <span class="txt"><span class="name">macOS Intel</span><span class="meta">DMG · ~6 MB</span></span>
+        </a>
+        <a class="dl-card" href="https://github.com/yuelangmanle/flowith/releases/download/v1.1.1/Flowith_1.1.1_x64-setup.exe" data-platform="win">
           <span class="ic">&#128187;</span>
-          <span class="txt"><span class="name">Windows 版</span><span class="meta">x64 · ~5 MB</span></span>
+          <span class="txt"><span class="name">Windows 安装包</span><span class="meta">EXE · ~5 MB</span></span>
+          <span class="badge-new">NEW</span>
         </a>
-        <a class="dl-card" href="https://github.com/yuelangmanle/flowith">
+        <a class="dl-card" href="https://github.com/yuelangmanle/flowith/releases/download/v1.1.1/Flowith_1.1.1_x64_en-US.msi" data-platform="win">
+          <span class="ic">&#128187;</span>
+          <span class="txt"><span class="name">Windows MSI</span><span class="meta">MSI · ~5 MB</span></span>
+        </a>
+        <a class="dl-card" href="https://github.com/yuelangmanle/flowith/releases/latest" data-platform="src">
           <span class="ic">&#127760;</span>
-          <span class="txt"><span class="name">源码运行</span><span class="meta">Node.js 20+</span></span>
+          <span class="txt"><span class="name">全部版本</span><span class="meta">GitHub Releases</span></span>
         </a>
       </div>
+
+      <details class="source-run">
+        <summary>&#128187; 或者从源码运行</summary>
+        <pre><code>git clone https://github.com/yuelangmanle/flowith.git
+cd flowith
+npm install
+npm run dev</code></pre>
+      </details>
     </section>
 
     <section id="features">
       <div class="section-title reveal"><h2>强大功能</h2><p>一站式 AI 协作体验</p></div>
       <div class="features">
         <div class="feat reveal"><div class="fi">&#129302;</div><h3>多 Agent 协作</h3><p>顺序、层级、圆桌讨论等多种编排模式，多个 AI 各司其职协同完成复杂任务</p></div>
-        <div class="feat reveal"><div class="fi">&#128640;</div><h3>多模型支持</h3><p>OpenAI、Claude、DeepSeek、MiMo、千问、Moonshot、Ollama 一键切换</p></div>
+        <div class="feat reveal"><div class="fi">&#128640;</div><h3>多模型支持</h3><p>OpenAI、Claude、DeepSeek、MiMo、千问、Moonshot、Gemini、Ollama 一键切换</p></div>
         <div class="feat reveal"><div class="fi">&#128736;&#65039;</div><h3>技能系统</h3><p>安装管理 AI 技能插件，Agent 自动学习运用，支持联网搜索和本地导入</p></div>
         <div class="feat reveal"><div class="fi">&#128187;</div><h3>代码生成</h3><p>从想法到可运行代码的 AI 驱动全流程，支持工作空间隔离和多轮修复</p></div>
         <div class="feat reveal"><div class="fi">&#128172;</div><h3>深度思考</h3><p>Claude、DeepSeek、Gemini 深度思考模式，思考过程可折叠展示</p></div>
-        <div class="feat reveal"><div class="fi">&#128230;</div><h3>Token 优化</h3><p>智能上下文压缩、缓存命中、动态 token 管理，大幅降低 API 成本</p></div>
+        <div class="feat reveal"><div class="fi">&#129504;</div><h3>智能记忆</h3><p>L1-L4 分层记忆架构，自动捕获、自动注入、规则整合、去重合并</p></div>
+        <div class="feat reveal"><div class="fi">&#128230;</div><h3>Token 优化</h3><p>智能上下文压缩、Anthropic 缓存命中、动态 token 管理，大幅降低 API 成本</p></div>
+        <div class="feat reveal"><div class="fi">&#127908;</div><h3>语音合成</h3><p>小米 MiMo TTS、OpenAI TTS、Edge TTS、Fish Audio 多引擎支持</p></div>
       </div>
     </section>
 
@@ -191,6 +235,7 @@
       <div class="stat"><div class="num">9+</div><div class="label">模型供应商</div></div>
       <div class="stat"><div class="num">3</div><div class="label">编排模式</div></div>
       <div class="stat"><div class="num">78</div><div class="label">测试用例</div></div>
+      <div class="stat"><div class="num">2</div><div class="label">桌面平台</div></div>
       <div class="stat"><div class="num">~6MB</div><div class="label">安装包</div></div>
     </section>
 
@@ -202,6 +247,15 @@
     <section id="changelog" class="changelog reveal">
       <div class="section-title"><h2>更新日志</h2><p>持续进化的 AI 协作体验</p></div>
       <div class="changelog-list">
+        <div class="changelog-item">
+          <div class="cl-header"><span class="cl-version">v1.1.1</span><span class="cl-date">2026-05-29</span></div>
+          <ul>
+            <li>🔧 修复 macOS x86_64 CI 构建失败问题</li>
+            <li>🐛 修复 Skills 上下文缓存重复清理</li>
+            <li>🏗️ TypeScript 编译警告修复</li>
+            <li>📦 Windows 构建支持（EXE + MSI）</li>
+          </ul>
+        </div>
         <div class="changelog-item">
           <div class="cl-header"><span class="cl-version">v1.1.0</span><span class="cl-date">2026-05-29</span></div>
           <ul>
@@ -229,8 +283,8 @@
     <section class="cta reveal">
       <h2>开始使用 Flowith</h2>
       <p>免费开源，支持 macOS 和 Windows</p>
-      <a class="cta-btn" href="https://github.com/yuelangmanle/flowith/releases/download/v1.1.0/Flowith_1.1.0_aarch64.dmg">
-        立即下载
+      <a class="cta-btn" href="https://github.com/yuelangmanle/flowith/releases/download/v1.1.1/Flowith_1.1.1_aarch64.dmg">
+        &#11015; 立即下载
       </a>
     </section>
   </div>
@@ -251,6 +305,16 @@
       entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); } });
     }, { threshold: 0.1 });
     document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+    // Platform filter
+    function showPlatform(platform) {
+      document.querySelectorAll('.platform-tab').forEach(t => t.classList.remove('active'));
+      event.target.classList.add('active');
+      document.querySelectorAll('.dl-card').forEach(card => {
+        const p = card.dataset.platform;
+        card.style.display = (platform === 'all' || p === platform) ? '' : 'none';
+      });
+    }
   </script>
 </body>
 </html>
