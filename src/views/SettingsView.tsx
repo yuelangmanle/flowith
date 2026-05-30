@@ -671,7 +671,7 @@ function ChangelogSection() {
   const [expanded, setExpanded] = useState(false);
   const versions = [
     {
-      version: "v1.3.7",
+      version: "v1.3.8",
       date: "2026-05-30",
       changes: [
         "🖼️ 移动端图片/文件上传修复",
