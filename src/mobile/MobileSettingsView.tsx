@@ -588,7 +588,7 @@ export function MobileSettingsView() {
 
         {/* ─── Auto-update ─── */}
         <div style={{ marginBottom: 20, display: "flex", alignItems: "center", gap: 8 }}>
-          <UpdateChecker currentVersion="1.3.5" platform="android" mode="compact" />
+          <UpdateChecker currentVersion="1.3.6" platform="android" mode="compact" />
         </div>
 
         {/* ─── Token Stats ─── */}
@@ -693,6 +693,18 @@ function StatCard({ label, value, color }: { label: string; value: string; color
 // ─── Data ───────────────────────────────────────────────────────
 
 const changelog = [
+  {
+    version: "v1.3.6",
+    date: "2026-05-30",
+    changes: [
+      "🖼️ 移动端图片/文件上传修复",
+      "🔧 Provider 冷启动持久化修复",
+      "🔄 更新检查版本号修复",
+      "💬 圆桌会议模型选择器",
+      "📦 内置 Skills 标识优化",
+      "📎 文件附件传入模型 API",
+    ],
+  },
   {
     version: "v1.3.5",
     date: "2026-05-30",

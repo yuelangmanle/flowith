@@ -7,7 +7,7 @@ import { saveProviders } from "../core/persistence";
 import type { ModelConfig, ProviderConfig, TTSProviderConfig } from "../core/types";
 
 // App version
-const APP_VERSION = "1.3.5";
+const APP_VERSION = "1.3.6";
 function detectPlatform(): "mac" | "win" | "android" {
   if ((window as any).Capacitor) return "android";
   const ua = navigator.userAgent.toLowerCase();
@@ -670,6 +670,18 @@ export function SettingsView() {
 function ChangelogSection() {
   const [expanded, setExpanded] = useState(false);
   const versions = [
+    {
+      version: "v1.3.6",
+      date: "2026-05-30",
+      changes: [
+        "🖼️ 移动端图片/文件上传修复",
+        "🔧 Provider 冷启动持久化修复",
+        "🔄 更新检查版本号修复",
+        "💬 圆桌会议模型选择器",
+        "📦 内置 Skills 标识优化",
+        "📎 文件附件传入模型 API",
+      ],
+    },
     {
       version: "v1.3.5",
       date: "2026-05-30",
