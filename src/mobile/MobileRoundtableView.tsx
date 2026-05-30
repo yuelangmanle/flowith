@@ -17,7 +17,7 @@ interface RoundtableMsg {
 
 export function MobileRoundtableView() {
   const store = useStore();
-  const { agents, providers, showToast, createConversation, setActiveConvId } = store;
+  const { agents, providers, models, showToast, createConversation, setActiveConvId } = store;
 
   const [topic, setTopic] = useState("");
   const [selectedAgents, setSelectedAgents] = useState<string[]>([]);
@@ -26,6 +26,7 @@ export function MobileRoundtableView() {
   const [messages, setMessages] = useState<RoundtableMsg[]>([]);
   const [report, setReport] = useState<string>("");
   const [showSetup, setShowSetup] = useState(true);
+  const [selectedModelId, setSelectedModelId] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -64,6 +65,7 @@ export function MobileRoundtableView() {
         body: JSON.stringify({
           topic: topic.trim(), agentIds: selectedAgents, rounds,
           providerId: provider.id,
+          model: selectedModelId || undefined,
         }),
         signal: controller.signal,
       });
@@ -210,6 +212,28 @@ export function MobileRoundtableView() {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Model selector */}
+          <div style={{ marginBottom: 16 }}>
+            <label style={labelStyle}>模型</label>
+            <input
+              list="roundtable-models"
+              value={selectedModelId}
+              onChange={(e) => setSelectedModelId(e.target.value)}
+              placeholder="自动选择"
+              style={{
+                width: "100%", padding: "8px 12px", borderRadius: 8,
+                border: "1px solid var(--border)", background: "var(--bg-card)",
+                fontSize: 13, color: "var(--text-primary)",
+              }}
+            />
+            <datalist id="roundtable-models">
+              {models.filter((m) => {
+                const p = providers.find((pp) => pp.id === m.providerId);
+                return p?.enabled;
+              }).map((m) => <option key={m.id} value={m.id} />)}
+            </datalist>
           </div>
 
           {/* Rounds */}

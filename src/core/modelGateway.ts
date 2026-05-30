@@ -182,7 +182,7 @@ export function mergeDiscoveredModels(
 export interface ChatCompletionRequest {
   provider: ProviderConfig;
   model: string;
-  messages: Array<{ role: string; content: string; reasoningContent?: string; imageData?: string; additionalImages?: string[] }>;
+  messages: Array<{ role: string; content: string; reasoningContent?: string; imageData?: string; additionalImages?: string[]; attachedFiles?: Array<{ name: string; type: string; size: number; content?: string }> }>;
   temperature?: number;
   maxTokens?: number;
   stream?: boolean;
@@ -193,9 +193,15 @@ export interface ChatCompletionRequest {
 
 function buildChatMessages(msgs: ChatCompletionRequest["messages"]): Array<{ role: string; content: string | Array<Record<string, unknown>>; reasoning_content?: string }> {
   return msgs.map((m) => {
+    // Append file content to message text
+    let textContent = m.content;
+    if (m.attachedFiles && m.attachedFiles.length > 0) {
+      const fileParts = m.attachedFiles.filter(f => f.content).map(f => `\n\n[文件: ${f.name}]\n\`\`\`\n${f.content}\n\`\`\``);
+      if (fileParts.length > 0) textContent += fileParts.join("");
+    }
     // Build multimodal content if images present
     if (m.imageData) {
-      const parts: Array<Record<string, unknown>> = [{ type: "text", text: m.content }];
+      const parts: Array<Record<string, unknown>> = [{ type: "text", text: textContent }];
       parts.push({ type: "image_url", image_url: { url: m.imageData } });
       if (m.additionalImages) {
         for (const img of m.additionalImages) {

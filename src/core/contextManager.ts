@@ -25,7 +25,7 @@ export interface ContextBuildOptions {
 }
 
 export interface ContextBuildResult {
-  messages: Array<{ role: string; content: string }>;
+  messages: Array<{ role: string; content: string; reasoningContent?: string; imageData?: string; additionalImages?: string[]; attachedFiles?: Array<{ name: string; type: string; size: number; content?: string }> }>;
   systemPrompt: string;
   stats: CompressionStats;
   skillsUsed: number;
@@ -177,7 +177,7 @@ export function buildContextMessages(
   });
 
   // 3. Build final message array within budget
-  const resultMessages: Array<{ role: string; content: string }> = [];
+  const resultMessages: Array<{ role: string; content: string; reasoningContent?: string; imageData?: string; additionalImages?: string[]; attachedFiles?: Array<{ name: string; type: string; size: number; content?: string }> }> = [];
   let usedTokens = systemTokens;
 
   // Add system prompt
@@ -202,7 +202,15 @@ export function buildContextMessages(
     };
     // Pass reasoningContent back for MiMo/DeepSeek multi-turn compatibility
     if (msg.reasoningContent) resultMsg.reasoningContent = msg.reasoningContent;
-    resultMessages.splice(1, 0, resultMsg as { role: string; content: string; reasoningContent?: string });
+    // Pass multimodal data through for vision models
+    if (msg.imageData) resultMsg.imageData = msg.imageData;
+    if (msg.additionalImages) resultMsg.additionalImages = msg.additionalImages;
+    if (msg.attachedFiles) resultMsg.attachedFiles = msg.attachedFiles;
+    // Pass multimodal data through for vision models
+    if (msg.imageData) resultMsg.imageData = msg.imageData;
+    if (msg.additionalImages) resultMsg.additionalImages = msg.additionalImages;
+    if (msg.attachedFiles) resultMsg.attachedFiles = msg.attachedFiles;
+    resultMessages.splice(1, 0, resultMsg as typeof resultMessages[0]);
     usedTokens += msgTokens;
   }
 
@@ -286,7 +294,7 @@ export async function buildContextMessagesAsync(
   });
 
   // Build final message array within budget
-  const resultMessages: Array<{ role: string; content: string }> = [];
+  const resultMessages: Array<{ role: string; content: string; reasoningContent?: string; imageData?: string; additionalImages?: string[]; attachedFiles?: Array<{ name: string; type: string; size: number; content?: string }> }> = [];
   let usedTokens = systemTokens;
 
   resultMessages.push({ role: "system", content: fullSystemPrompt });
@@ -306,7 +314,7 @@ export async function buildContextMessagesAsync(
     };
     // Pass reasoningContent back for MiMo/DeepSeek multi-turn compatibility
     if (msg.reasoningContent) resultMsg.reasoningContent = msg.reasoningContent;
-    resultMessages.splice(1, 0, resultMsg as { role: string; content: string; reasoningContent?: string });
+    resultMessages.splice(1, 0, resultMsg as typeof resultMessages[0]);
     usedTokens += msgTokens;
   }
 

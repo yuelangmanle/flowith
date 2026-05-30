@@ -7,7 +7,7 @@ import { saveProviders } from "../core/persistence";
 import type { ModelConfig, ProviderConfig, TTSProviderConfig } from "../core/types";
 
 // App version
-const APP_VERSION = "1.3.4";
+const APP_VERSION = "1.3.5";
 function detectPlatform(): "mac" | "win" | "android" {
   if ((window as any).Capacitor) return "android";
   const ua = navigator.userAgent.toLowerCase();
@@ -670,6 +670,20 @@ export function SettingsView() {
 function ChangelogSection() {
   const [expanded, setExpanded] = useState(false);
   const versions = [
+    {
+      version: "v1.3.5",
+      date: "2026-05-30",
+      changes: [
+        "✨ 重新生成自动发送（桌面+移动端）",
+        "🔍 模型选择器支持搜索",
+        "✏️ 消息编辑重发（Cmd+Enter）",
+        "💰 Token 费用估算显示",
+        "⌨️ 键盘快捷键（Cmd+K/N/Escape）",
+        "📝 对话重命名 + Agent 对话筛选",
+        "🖼️ 移动端图片/文件上传修复",
+        "🔧 Provider 冷启动持久化修复",
+      ],
+    },
     {
       version: "v1.3.4",
       date: "2026-05-29",

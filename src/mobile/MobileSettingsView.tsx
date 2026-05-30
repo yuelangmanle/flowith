@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { useStore } from "../lib/store";
 import { apiFetch, getProviderIcon } from "../lib/shared";
-import { saveProviders } from "../core/persistence";
+// Provider persistence handled via apiFetch
 import type { ProviderConfig, TTSProviderConfig, ModelConfig } from "../core/types";
 
 // ─── Provider Card ──────────────────────────────────────────────
@@ -456,7 +456,7 @@ export function MobileSettingsView() {
   const updateProvider = (id: string, updater: (p: ProviderConfig) => ProviderConfig) => {
     const newProviders = providers.map((p) => (p.id === id ? updater(p) : p));
     setProviders(newProviders);
-    saveProviders(newProviders);
+    apiFetch("/api/providers", { method: "PUT", body: JSON.stringify(newProviders) });
     syncProvidersToServer();
   };
 
@@ -588,7 +588,7 @@ export function MobileSettingsView() {
 
         {/* ─── Auto-update ─── */}
         <div style={{ marginBottom: 20, display: "flex", alignItems: "center", gap: 8 }}>
-          <UpdateChecker currentVersion="1.3.4" platform="android" mode="compact" />
+          <UpdateChecker currentVersion="1.3.5" platform="android" mode="compact" />
         </div>
 
         {/* ─── Token Stats ─── */}
@@ -693,6 +693,20 @@ function StatCard({ label, value, color }: { label: string; value: string; color
 // ─── Data ───────────────────────────────────────────────────────
 
 const changelog = [
+  {
+    version: "v1.3.5",
+    date: "2026-05-30",
+    changes: [
+      "✨ 重新生成自动发送（桌面+移动端）",
+      "🔍 模型选择器支持搜索",
+      "✏️ 消息编辑重发（Cmd+Enter）",
+      "💰 Token 费用估算显示",
+      "⌨️ 键盘快捷键（Cmd+K/N/Escape）",
+      "📝 对话重命名 + Agent 对话筛选",
+      "🖼️ 移动端图片/文件上传修复",
+      "🔧 Provider 冷启动持久化修复",
+    ],
+  },
   {
     version: "v1.3.4",
     date: "2026-05-29",

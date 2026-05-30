@@ -108,7 +108,7 @@ export function MobileSkillsView() {
 
   // Filter
   const filtered = skills.filter((s) => {
-    if (activeCategory === "installed") return s.installed;
+    if (activeCategory === "installed") return s.installed || s.source === "builtin";
     if (activeCategory !== "all") return s.categoryZh === activeCategory || s.category === activeCategory;
     return true;
   }).filter((s) => {
@@ -345,16 +345,20 @@ export function MobileSkillsView() {
                     <ExternalLink size={12} />
                   </a>
                 )}
-                <button
-                  onClick={(e) => { e.stopPropagation(); skill.installed ? uninstallSkill(skill.id) : installSkill(skill); }}
-                  style={{
-                    padding: 4, border: "none", background: "transparent",
-                    color: skill.installed ? "var(--accent, #f43f5e)" : "var(--primary)",
-                    cursor: "pointer", display: "flex",
-                  }}
-                >
-                  {skill.installed ? <Trash2 size={12} /> : <Download size={12} />}
-                </button>
+                {skill.source === "builtin" ? (
+                  <span style={{ fontSize: 10, padding: "2px 6px", borderRadius: 4, background: "rgba(78,205,196,0.15)", color: "var(--primary)" }}>内置</span>
+                ) : (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); skill.installed ? uninstallSkill(skill.id) : installSkill(skill); }}
+                    style={{
+                      padding: 4, border: "none", background: "transparent",
+                      color: skill.installed ? "var(--accent, #f43f5e)" : "var(--primary)",
+                      cursor: "pointer", display: "flex",
+                    }}
+                  >
+                    {skill.installed ? <Trash2 size={12} /> : <Download size={12} />}
+                  </button>
+                )}
               </div>
             </div>
 
@@ -391,12 +395,12 @@ export function MobileSkillsView() {
             )}
 
             {/* Installed badge */}
-            {skill.installed && (
+            {(skill.installed || skill.source === "builtin") && (
               <div style={{
                 marginTop: 6, padding: "3px 8px", borderRadius: 4,
                 background: "rgba(78,205,196,0.1)", color: "var(--primary)",
                 fontSize: 11, display: "inline-block",
-              }}>✓ 已安装</div>
+              }}>{skill.source === "builtin" ? "✓ 内置" : "✓ 已安装"}</div>
             )}
           </div>
         ))}
