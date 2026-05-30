@@ -206,10 +206,6 @@ export function buildContextMessages(
     if (msg.imageData) resultMsg.imageData = msg.imageData;
     if (msg.additionalImages) resultMsg.additionalImages = msg.additionalImages;
     if (msg.attachedFiles) resultMsg.attachedFiles = msg.attachedFiles;
-    // Pass multimodal data through for vision models
-    if (msg.imageData) resultMsg.imageData = msg.imageData;
-    if (msg.additionalImages) resultMsg.additionalImages = msg.additionalImages;
-    if (msg.attachedFiles) resultMsg.attachedFiles = msg.attachedFiles;
     resultMessages.splice(1, 0, resultMsg as typeof resultMessages[0]);
     usedTokens += msgTokens;
   }

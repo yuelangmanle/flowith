@@ -212,7 +212,7 @@ function buildChatMessages(msgs: ChatCompletionRequest["messages"]): Array<{ rol
       if (m.reasoningContent) result.reasoning_content = m.reasoningContent;
       return result;
     }
-    const result: { role: string; content: string | Array<Record<string, unknown>>; reasoning_content?: string } = { role: m.role, content: m.content };
+    const result: { role: string; content: string | Array<Record<string, unknown>>; reasoning_content?: string } = { role: m.role, content: textContent };
     if (m.reasoningContent) result.reasoning_content = m.reasoningContent;
     return result;
   });

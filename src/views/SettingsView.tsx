@@ -795,7 +795,7 @@ function ChangelogSection() {
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 16 }}>📋</span>
           <span style={{ fontSize: 14, fontWeight: 600 }}>更新日志</span>
-          <span style={{ fontSize: 11, color: "var(--text-muted)", background: "var(--bg)", padding: "2px 8px", borderRadius: 4 }}>v1.3.4</span>
+          <span style={{ fontSize: 11, color: "var(--text-muted)", background: "var(--bg)", padding: "2px 8px", borderRadius: 4 }}>v1.3.6</span>
         </div>
         <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{expanded ? "收起" : "展开"}</span>
       </div>
