@@ -217,7 +217,7 @@
 
   <div class="wrap">
     <section class="hero">
-      <div class="hero-badge"><span class="dot"></span> <span id="hero-version">v1.3.4</span> 已发布 · macOS + Windows</div>
+      <div class="hero-badge"><span class="dot"></span> <span id="hero-version">v1.3.5</span> 已发布 · macOS + Windows</div>
       <h1>Flowith</h1>
       <p>多 AI Agent 智能协作平台。多个 AI 各司其职，圆桌讨论、顺序编排、层级协作，一站式完成复杂任务。</p>
 
@@ -230,21 +230,21 @@
       </div>
 
       <div class="dl-grid" id="dl-grid">
-        <a class="dl-card primary" href="https://github.com/yuelangmanle/flowith/releases/download/v1.3.4/Flowith_1.3.4_aarch64.dmg" data-platform="mac" data-pattern="Flowith_{V}_aarch64.dmg">
+        <a class="dl-card primary" href="https://github.com/yuelangmanle/flowith/releases/download/v1.3.5/Flowith_1.3.5_aarch64.dmg" data-platform="mac" data-pattern="Flowith_{V}_aarch64.dmg">
           <span class="ic">&#127822;</span>
           <span class="txt"><span class="name">macOS Apple Silicon</span><span class="meta">DMG · ~6 MB</span></span>
           <span class="badge-new">推荐</span>
         </a>
-        <a class="dl-card" href="https://github.com/yuelangmanle/flowith/releases/download/v1.3.4/Flowith_1.3.4_x64.dmg" data-platform="mac" data-pattern="Flowith_{V}_x64.dmg">
+        <a class="dl-card" href="https://github.com/yuelangmanle/flowith/releases/download/v1.3.5/Flowith_1.3.5_x64.dmg" data-platform="mac" data-pattern="Flowith_{V}_x64.dmg">
           <span class="ic">&#127822;</span>
           <span class="txt"><span class="name">macOS Intel</span><span class="meta">DMG · ~6 MB</span></span>
         </a>
-        <a class="dl-card" href="https://github.com/yuelangmanle/flowith/releases/download/v1.3.4/Flowith_1.3.4_x64-setup.exe" data-platform="win" data-pattern="Flowith_{V}_x64-setup.exe">
+        <a class="dl-card" href="https://github.com/yuelangmanle/flowith/releases/download/v1.3.5/Flowith_1.3.5_x64-setup.exe" data-platform="win" data-pattern="Flowith_{V}_x64-setup.exe">
           <span class="ic">&#128187;</span>
           <span class="txt"><span class="name">Windows EXE</span><span class="meta">安装包 · ~6 MB</span></span>
           <span class="badge-new">推荐</span>
         </a>
-        <a class="dl-card" href="https://github.com/yuelangmanle/flowith/releases/download/v1.3.4/Flowith_1.3.4_x64_en-US.msi" data-platform="win" data-pattern="Flowith_{V}_x64_en-US.msi">
+        <a class="dl-card" href="https://github.com/yuelangmanle/flowith/releases/download/v1.3.5/Flowith_1.3.5_x64_en-US.msi" data-platform="win" data-pattern="Flowith_{V}_x64_en-US.msi">
           <span class="ic">&#128187;</span>
           <span class="txt"><span class="name">Windows MSI</span><span class="meta">安装包 · ~6 MB</span></span>
         </a>
@@ -425,6 +425,19 @@ npm run dev</code></pre>
       <div class="section-title"><h2>更新日志</h2><p>持续进化的 AI 协作体验</p></div>
       <div class="changelog-list" id="changelog-list">
         <div class="changelog-item">
+          <div class="cl-header"><span class="cl-version">v1.3.5</span><span class="cl-date">2026-05-30</span></div>
+          <ul>
+            <li>&#10024; 重新生成按钮自动发送消息（桌面+移动端）</li>
+            <li>&#128269; 模型选择器支持搜索（桌面+移动端）</li>
+            <li>&#9997;&#65039; 消息编辑重发（Cmd+Enter）</li>
+            <li>&#128176; Token 费用估算显示</li>
+            <li>&#9000;&#65039; 键盘快捷键（Cmd+K/N/Escape）</li>
+            <li>&#128221; 对话重命名 + Agent 对话筛选</li>
+            <li>&#128260; 移动端重新生成自动发送修复</li>
+            <li>&#128241; 移动端模型搜索支持</li>
+          </ul>
+        </div>
+        <div class="changelog-item">
           <div class="cl-header"><span class="cl-version">v1.3.4</span><span class="cl-date">2026-05-29</span></div>
           <ul>
             <li>&#129504; MiMo reasoning_content 多轮对话回传修复</li>
@@ -464,7 +477,7 @@ npm run dev</code></pre>
     <section class="cta reveal">
       <h2>开始使用 Flowith</h2>
       <p>免费开源，支持 macOS、Windows 和 Android</p>
-      <a class="cta-btn" id="cta-download" href="https://github.com/yuelangmanle/flowith/releases/download/v1.3.4/Flowith_1.3.4_aarch64.dmg">
+      <a class="cta-btn" id="cta-download" href="https://github.com/yuelangmanle/flowith/releases/download/v1.3.5/Flowith_1.3.5_aarch64.dmg">
         &#11015; 立即下载
       </a>
     </section>
@@ -504,7 +517,7 @@ npm run dev</code></pre>
 
     // ─── Dynamic GitHub Release Fetching ───
     const REPO = 'yuelangmanle/flowith';
-    const FALLBACK_VERSION = 'v1.3.4';
+    const FALLBACK_VERSION = 'v1.3.5';
 
     async function loadLatestRelease() {
       try {
