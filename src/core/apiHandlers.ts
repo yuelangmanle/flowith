@@ -94,8 +94,9 @@ export function handleGetProviders(state: AppState) {
   return state.providers;
 }
 
-export async function handlePutProviders(state: AppState, body: { providers: ProviderConfig[] }) {
-  if (body.providers) state.providers = body.providers;
+export async function handlePutProviders(state: AppState, body: any) {
+  const providers = body?.providers ?? (Array.isArray(body) ? body : null);
+  if (providers) state.providers = providers;
   await state.saveProviders?.();
   return { ok: true };
 }
@@ -122,10 +123,11 @@ export function handleGetConversations(state: AppState) {
   return Array.from(state.conversations.values());
 }
 
-export async function handlePutConversations(state: AppState, body: { conversations: Conversation[] }) {
-  if (Array.isArray(body.conversations)) {
+export async function handlePutConversations(state: AppState, body: any) {
+  const convs = body?.conversations ?? (Array.isArray(body) ? body : null);
+  if (Array.isArray(convs)) {
     state.conversations.clear();
-    for (const conv of body.conversations) state.conversations.set(conv.id, conv);
+    for (const conv of convs) state.conversations.set(conv.id, conv);
   }
   await state.saveConversations?.();
   return { ok: true };

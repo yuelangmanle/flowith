@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bot, Plus, Trash2, Volume2, ChevronDown, ChevronRight } from "lucide-react";
+import { Bot, Plus, Trash2, Volume2, ChevronDown, ChevronRight, Sparkles, Loader2 } from "lucide-react";
 import { useStore } from "../lib/store";
 import { apiFetch, getProviderIcon } from "../lib/shared";
 import type { AgentConfig, AgentTTSConfig } from "../core/types";
@@ -21,6 +21,9 @@ export function MobileAgentsView() {
   const [newPrompt, setNewPrompt] = useState("");
   const [newAvatar, setNewAvatar] = useState("✦");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [showAI, setShowAI] = useState(false);
+  const [aiDesc, setAiDesc] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
 
   const speakText = async (text: string, agentId?: string) => {
     const agentTTS = agentId ? agentTTSConfigs.find((c) => c.agentId === agentId) : undefined;
@@ -45,6 +48,42 @@ export function MobileAgentsView() {
         await audio.play();
       } else { setTtsPlaying(false); showToast("TTS 失败", "error"); }
     } catch { setTtsPlaying(false); }
+  };
+
+
+  const aiCreateAgent = async () => {
+    if (!aiDesc.trim()) return;
+    setAiLoading(true);
+    try {
+      const cfg = useStore.getState().getEffectiveConfig("agent-moderator");
+      const resp = await apiFetch("/api/generate", {
+        method: "POST",
+        body: JSON.stringify({
+          providerId: cfg.providerId, model: cfg.modelId,
+          messages: [
+            { role: "system", content: "你是一个 Agent 配置生成器。用户会描述他们需要什么样的 AI Agent，你需要返回一个 JSON 对象，包含以下字段：name（中文名称，2-4字）、role（从以下选一个：coder/researcher/product/testing/documentation/moderator/architecture/ui/review/critic）、avatar（一个 emoji）、systemPrompt（详细的系统提示词，中文）、goal（一句话目标，中文）、color（十六进制颜色代码）。只返回 JSON，不要其他内容。" },
+            { role: "user", content: aiDesc },
+          ],
+          stream: false,
+        }),
+      });
+      if (resp.ok) {
+        const data = (await resp.json()) as { content?: string };
+        const text = data.content ?? "";
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          setNewName(parsed.name ?? "");
+          setNewRole(parsed.role ?? "coder");
+          setNewAvatar(parsed.avatar ?? "✦");
+          setNewPrompt(parsed.systemPrompt ?? "");
+          setShowAI(false);
+          setShowCreate(true);
+          showToast("AI 已生成配置，请确认后创建", "success");
+        }
+      }
+    } catch { showToast("AI 生成失败，请手动创建", "error"); }
+    setAiLoading(false);
   };
 
   const handleCreate = async () => {
@@ -72,7 +111,7 @@ export function MobileAgentsView() {
   };
 
   const roleLabels: Record<string, string> = {
-    coder: "编码", researcher: "研究", product: "产品", testing: "测试",
+    coder: "编码", researcher: "研究", product: "产品", testing: "测试", critic: "反方",
     documentation: "文档", moderator: "主持", architecture: "架构",
     ui: "UI设计", review: "审查",
   };
@@ -82,17 +121,55 @@ export function MobileAgentsView() {
       {/* Header */}
       <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h2 style={{ fontSize: 18, fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>Agent 管理</h2>
-        <button onClick={() => setShowCreate(!showCreate)} style={{
-          display: "flex", alignItems: "center", gap: 4,
-          padding: "8px 12px", borderRadius: 8, border: "none",
-          background: "var(--primary)", color: "#fff", fontSize: 13,
-          fontWeight: 600, cursor: "pointer",
-        }}>
-          <Plus size={14} /> 创建
-        </button>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button onClick={() => { setShowAI(!showAI); setShowCreate(false); }} style={{
+            display: "flex", alignItems: "center", gap: 4,
+            padding: "8px 12px", borderRadius: 8, border: "1px solid var(--primary)",
+            background: "transparent", color: "var(--primary)", fontSize: 13,
+            fontWeight: 600, cursor: "pointer",
+          }}>
+            <Sparkles size={14} /> AI
+          </button>
+          <button onClick={() => { setShowCreate(!showCreate); setShowAI(false); }} style={{
+            display: "flex", alignItems: "center", gap: 4,
+            padding: "8px 12px", borderRadius: 8, border: "none",
+            background: "var(--primary)", color: "#fff", fontSize: 13,
+            fontWeight: 600, cursor: "pointer",
+          }}>
+            <Plus size={14} /> 创建
+          </button>
+        </div>
       </div>
 
       <div style={{ flex: 1, overflow: "auto", padding: 16 }}>
+
+        {/* AI Create form */}
+        {showAI && (
+          <div style={{
+            padding: 14, marginBottom: 12, borderRadius: 12,
+            border: "1px solid var(--primary)", background: "var(--bg-card)",
+          }}>
+            <h4 style={{ fontSize: 14, fontWeight: 600, marginBottom: 10, color: "var(--text-primary)", display: "flex", alignItems: "center", gap: 6 }}>
+              <Sparkles size={14} /> AI 辅助创建
+            </h4>
+            <div style={{ marginBottom: 8 }}>
+              <label style={labelStyle}>描述你需要的 Agent</label>
+              <textarea value={aiDesc} onChange={(e) => setAiDesc(e.target.value)} placeholder="例如：我需要一个专门帮我写论文的 Agent..." style={{ ...inputStyle, width: "100%", minHeight: 80, resize: "none" }} />
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              <button onClick={aiCreateAgent} disabled={aiLoading || !aiDesc.trim()} style={{
+                flex: 1, padding: "8px 12px", borderRadius: 8, border: "none",
+                background: aiDesc.trim() && !aiLoading ? "var(--primary)" : "var(--bg-active)",
+                color: aiDesc.trim() && !aiLoading ? "#fff" : "var(--text-muted)",
+                fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
+              }}>
+                {aiLoading ? <><Loader2 size={14} className="spin" /> 生成中</> : <><Sparkles size={14} /> 生成</>}
+              </button>
+              <button onClick={() => setShowAI(false)} style={{ padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-card)", color: "var(--text-secondary)", fontSize: 13, cursor: "pointer" }}>取消</button>
+            </div>
+          </div>
+        )}
+
         {/* Create form */}
         {showCreate && (
           <div style={{

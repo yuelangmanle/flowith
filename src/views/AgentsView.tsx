@@ -1,12 +1,15 @@
 import { useState } from "react";
-import { Bot, Plus, Trash2, Volume2 } from "lucide-react";
+import { Bot, Plus, Trash2, Volume2, Sparkles, Loader2 } from "lucide-react";
 import { useStore } from "../lib/store";
 import { apiFetch, getProviderIcon } from "../lib/shared";
 import type { AgentConfig, AgentTTSConfig } from "../core/types";
 
 export function AgentsView() {
-  const { agents, setAgents, providers, models, selectedProviderId, selectedModelId, agentModelConfigs, setAgentModelConfigs, agentTTSConfigs, setAgentTTSConfigs, ttsProviders, ttsPlaying, showToast } = useStore();
+  const { agents, setAgents, providers, models, selectedProviderId, selectedModelId, agentModelConfigs, setAgentModelConfigs, agentTTSConfigs, setAgentTTSConfigs, ttsProviders, ttsPlaying, showToast, getEffectiveConfig } = useStore();
   const [showCreate, setShowCreate] = useState(false);
+  const [showAI, setShowAI] = useState(false);
+  const [aiDesc, setAiDesc] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
   const [newName, setNewName] = useState("");
   const [newRole, setNewRole] = useState<AgentConfig["role"]>("coder");
   const [newPrompt, setNewPrompt] = useState("");
@@ -34,12 +37,72 @@ export function AgentsView() {
     } catch { setTtsPlaying(false); }
   };
 
+  const aiCreateAgent = async () => {
+    if (!aiDesc.trim()) return;
+    setAiLoading(true);
+    try {
+      const cfg = getEffectiveConfig("agent-moderator");
+      const resp = await apiFetch("/api/generate", {
+        method: "POST",
+        body: JSON.stringify({
+          providerId: cfg.providerId,
+          model: cfg.modelId,
+          messages: [
+            { role: "system", content: "你是一个 Agent 配置生成器。用户会描述他们需要什么样的 AI Agent，你需要返回一个 JSON 对象，包含以下字段：name（中文名称，2-4字）、role（从以下选一个：coder/researcher/product/testing/documentation/moderator/architecture/ui/review/critic）、avatar（一个 emoji）、systemPrompt（详细的系统提示词，中文）、goal（一句话目标，中文）、color（十六进制颜色代码）。只返回 JSON，不要其他内容。" },
+            { role: "user", content: aiDesc },
+          ],
+          stream: false,
+        }),
+      });
+      if (resp.ok) {
+        const data = await resp.json() as { content?: string };
+        const text = data.content ?? "";
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          setNewName(parsed.name ?? "");
+          setNewRole(parsed.role ?? "coder");
+          setNewAvatar(parsed.avatar ?? "✦");
+          setNewPrompt(parsed.systemPrompt ?? "");
+          setShowAI(false);
+          setShowCreate(true);
+          showToast("AI 已生成配置，请确认后创建", "success");
+        }
+      }
+    } catch {
+      showToast("AI 生成失败，请手动创建", "error");
+    }
+    setAiLoading(false);
+  };
+
   return (
     <div style={{ padding: 20, overflowY: "auto", flex: 1 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
         <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}><Bot size={18} /> Agent 管理</h3>
-        <button className="primary" onClick={() => setShowCreate(!showCreate)}><Plus size={14} /> 创建 Agent</button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => { setShowAI(!showAI); setShowCreate(false); }} style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 12px", borderRadius: 8, border: "1px solid var(--primary)", background: "transparent", color: "var(--primary)", cursor: "pointer", fontSize: 13 }}><Sparkles size={14} /> AI 帮我创建</button>
+          <button className="primary" onClick={() => { setShowCreate(!showCreate); setShowAI(false); }}><Plus size={14} /> 创建 Agent</button>
+        </div>
       </div>
+
+      {showAI && (
+        <div className="provider-card" style={{ marginBottom: 16, border: "1px solid var(--primary)" }}>
+          <h4 style={{ marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}><Sparkles size={14} /> AI 辅助创建</h4>
+          <div className="p-fields">
+            <div className="field-row">
+              <label>描述需求</label>
+              <textarea value={aiDesc} onChange={(e) => setAiDesc(e.target.value)} placeholder="例如：我需要一个专门帮我写论文的 Agent，擅长学术写作和文献综述..." style={{ flex: 1, padding: "6px 10px", borderRadius: 6, border: "1px solid var(--border)", minHeight: 80, fontFamily: "var(--font)", fontSize: 13 }} />
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              <button className="primary" onClick={aiCreateAgent} disabled={aiLoading || !aiDesc.trim()}>
+                {aiLoading ? <><Loader2 size={14} className="spin" /> 生成中...</> : <><Sparkles size={14} /> 生成 Agent</>}
+              </button>
+              <button onClick={() => setShowAI(false)}>取消</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showCreate && (
         <div className="provider-card" style={{ marginBottom: 16 }}>
           <h4 style={{ marginBottom: 10 }}>创建自定义 Agent</h4>
@@ -47,42 +110,49 @@ export function AgentsView() {
             <div className="field-row"><label>名称</label><input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Agent 名称" /></div>
             <div className="field-row"><label>Emoji</label><input value={newAvatar} onChange={(e) => setNewAvatar(e.target.value)} style={{ width: 50, textAlign: "center" }} /></div>
             <div className="field-row"><label>角色</label><select value={newRole} onChange={(e) => setNewRole(e.target.value as AgentConfig["role"])} style={{ flex: 1, padding: "6px 10px", borderRadius: 6, border: "1px solid var(--border)" }}>
-              <option value="coder">编码</option><option value="researcher">研究</option><option value="product">产品</option><option value="testing">测试</option><option value="documentation">文档</option>
+              <option value="coder">编码</option><option value="researcher">研究</option><option value="product">产品</option><option value="testing">测试</option><option value="documentation">文档</option><option value="moderator">主持</option><option value="architecture">架构</option><option value="ui">UI设计</option><option value="review">审查</option><option value="critic">反方</option>
             </select></div>
             <div className="field-row"><label>System Prompt</label><textarea value={newPrompt} onChange={(e) => setNewPrompt(e.target.value)} placeholder="定义 Agent 的行为..." style={{ flex: 1, padding: "6px 10px", borderRadius: 6, border: "1px solid var(--border)", minHeight: 60, fontFamily: "var(--font)", fontSize: 13 }} /></div>
             <div style={{ display: "flex", gap: 6 }}>
               <button className="primary" onClick={async () => {
                 if (!newName.trim()) return;
                 const resp = await apiFetch("/api/agents", { method: "POST", body: JSON.stringify({ name: newName, role: newRole, avatar: newAvatar, systemPrompt: newPrompt, goal: newPrompt.slice(0, 50) }) });
-                if (resp.ok) { const a = await resp.json() as AgentConfig; setAgents((prev) => [...prev, a]); setShowCreate(false); setNewName(""); setNewPrompt(""); setNewAvatar("✦"); }
+                if (resp.ok) { const a = await resp.json() as AgentConfig; setAgents((prev) => [...prev, a]); setShowCreate(false); setNewName(""); setNewPrompt(""); setNewAvatar("✦"); showToast("Agent 已创建", "success"); }
               }}>创建</button>
               <button onClick={() => setShowCreate(false)}>取消</button>
             </div>
           </div>
         </div>
       )}
+
       {agents.map((a) => {
         const agentCfg = agentModelConfigs.find((c) => c.agentId === a.id && !c.useGlobal);
         const globalProv = providers.find((p) => p.id === selectedProviderId);
         const globalModel = models.find((m) => m.id === selectedModelId);
-        const effectiveModel = agentCfg?.modelId ?? (globalModel ? `${globalProv?.name ?? ""} / ${globalModel.id}` : "未设置");
+        const effectiveModel = agentCfg?.modelId ?? (globalModel ? `${globalProv?.name ?? ""} / ${globalModel.id}` : "未配置");
         return (
-          <div key={a.id} className="agent-card" style={{ marginBottom: 6, flexDirection: "column", alignItems: "stretch" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div className="a-avatar" style={{ background: a.color }}>{a.avatar}</div>
-              <div className="a-info">
-                <div className="a-name">{a.name} {a.custom && <span style={{ fontSize: 10, color: "var(--text-muted)" }}>(自定义)</span>}</div>
-                <div className="a-role">{a.role}</div>
-                <div className="a-goal">{a.goal || a.systemPrompt?.slice(0, 60)}</div>
+          <div key={a.id} className="provider-card" style={{ marginBottom: 8, borderLeft: `3px solid ${a.color}` }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+              <span style={{ fontSize: 22 }}>{a.avatar}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600, fontSize: 14 }}>{a.name} {a.custom && <span style={{ fontSize: 10, color: "var(--primary)" }}>自定义</span>}</div>
+                <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{a.goal}</div>
               </div>
-              {a.custom && <button className="icon-btn" onClick={async () => { await apiFetch(`/api/agents/${a.id}`, { method: "DELETE" }); setAgents((prev) => prev.filter((aa) => aa.id !== a.id)); }}><Trash2 size={14} /></button>}
+              <span style={{ fontSize: 10, color: "var(--text-muted)", background: "var(--bg-active)", padding: "2px 6px", borderRadius: 4 }}>{a.role}</span>
+              {a.custom && <button className="icon-btn" onClick={() => {
+                setAgents((prev) => prev.filter((ag) => ag.id !== a.id));
+                apiFetch(`/api/agents/${a.id}`, { method: "DELETE" });
+              }} style={{ color: "var(--accent)" }}><Trash2 size={14} /></button>}
             </div>
-            <div style={{ display: "flex", gap: 6, marginTop: 6, alignItems: "center", flexWrap: "wrap" }}>
-              <span style={{ fontSize: 11, color: "var(--text-muted)", minWidth: 50 }}>模型:</span>
+            <div style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 6 }}>{a.systemPrompt}</div>
+            {/* Per-Agent Model */}
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 10, color: "var(--text-muted)" }}>模型:</span>
               <select value={agentCfg?.providerId ?? ""} onChange={(e) => {
                 const v = e.target.value;
-                if (!v) { const nc = agentModelConfigs.filter((c) => c.agentId !== a.id); setAgentModelConfigs(nc); apiFetch("/api/agent-models", { method: "PUT", body: JSON.stringify({ configs: nc }) }); }
-                else { const pm = models.filter((m) => m.providerId === v); const nc = [...agentModelConfigs.filter((c) => c.agentId !== a.id), { agentId: a.id, providerId: v, modelId: pm[0]?.id ?? "" }]; setAgentModelConfigs(nc); apiFetch("/api/agent-models", { method: "PUT", body: JSON.stringify({ configs: nc }) }); }
+                const nc = agentModelConfigs.filter((c) => c.agentId !== a.id);
+                if (v) { const pm = models.filter((m) => m.providerId === v); nc.push({ agentId: a.id, providerId: v, modelId: pm[0]?.id ?? "" }); }
+                setAgentModelConfigs(nc); apiFetch("/api/agent-models", { method: "PUT", body: JSON.stringify({ configs: nc }) });
               }} style={{ padding: "3px 6px", borderRadius: 4, border: "1px solid var(--border)", fontSize: 11, background: "var(--bg-card)", maxWidth: 100 }}>
                 <option value="">全局</option>
                 {providers.filter((p) => p.enabled).map((p) => <option key={p.id} value={p.id}>{getProviderIcon(p.type)} {p.name}</option>)}

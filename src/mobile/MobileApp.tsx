@@ -107,6 +107,22 @@ export function MobileApp() {
     });
   }, []);
 
+  // Save conversations when app goes to background or closes
+  useEffect(() => {
+    const saveOnHide = () => {
+      if (document.visibilityState === "hidden") {
+        const convs = useStore.getState().conversations;
+        apiFetch("/api/conversations", { method: "PUT", body: JSON.stringify({ conversations: convs }) });
+      }
+    };
+    document.addEventListener("visibilitychange", saveOnHide);
+    window.addEventListener("beforeunload", saveOnHide);
+    return () => {
+      document.removeEventListener("visibilitychange", saveOnHide);
+      window.removeEventListener("beforeunload", saveOnHide);
+    };
+  }, []);
+
   // Loading screen
   if (loading) {
     return (

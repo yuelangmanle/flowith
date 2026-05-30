@@ -9,6 +9,7 @@ import type { ChatMessage } from "../core/types";
 import { UserIcon, BotIcon, BrainIcon, ZapIcon, EyeIcon, FileIcon, LinkIcon, ChatIcon } from "../components/icons";
 import { ThinkingBlock } from "../components/ThinkingBlock";
 import { estimateTokens } from "../core/tokenCounter";
+import { getFallbackModels } from "../core/modelGateway";
 
 export function ChatView() {
   const store = useStore();
@@ -641,25 +642,16 @@ export function ChatView() {
               <div className="msg-bubble">
                 {streamingAgent && <div className="msg-agent-name" style={{ color: streamingAgent.color }}>{streamingAgent.avatar} {streamingAgent.name}<span className="streaming-dot" /></div>}
                 {(() => {
-                  // Merge all <think> blocks (streaming may send multiple small blocks)
                   let processed = streamingContent;
                   let prev2 = "";
                   while (prev2 !== processed) { prev2 = processed; processed = processed.replace(/<\/think>[\s\n]*<think>>/g, "\n"); }
-                  // Also handle incomplete last block (still streaming)
                   const allThinkMatches = processed.match(/<think>([\s\S]*?)(<\/think>|$)/g);
                   if (allThinkMatches && allThinkMatches.length > 0) {
-                    const thinkText = allThinkMatches.map(m => m.replace(/<think>|<\/think>/g, "")).join("").trim();
                     const mainText = processed.replace(/<think>[\s\S]*?(<\/think>|$)/g, "").trim();
-                    // Clean up fragmented thinking
-                    const lines = thinkText.split("\n").filter(l => l.trim().length > 0);
-                    const avgLen = lines.length > 0 ? lines.reduce((s, l) => s + l.trim().length, 0) / lines.length : 0;
-                    const displayThink = (lines.length > 3 && avgLen < 30)
-                      ? lines.map(l => l.trim()).join("")
-                      : thinkText;
                     return (
                       <>
-                        <div style={{ marginBottom: 6, padding: "6px 10px", borderRadius: 6, background: "var(--bg)", border: "1px solid var(--border)", fontSize: 11, color: "var(--text-secondary)" }}>
-                          <span style={{ marginRight: 4 }}><BrainIcon size={14} /></span>深度思考中... ({displayThink.length} 字)
+                        <div style={{ marginBottom: 6, display: "flex", alignItems: "center", gap: 6, padding: "6px 10px", borderRadius: 6, background: "var(--bg)", border: "1px solid var(--border)", fontSize: 11, color: "var(--text-secondary)" }}>
+                          <Loader2 size={12} className="spin" /> 深度思考中...
                         </div>
                         {mainText && <div style={{ whiteSpace: "pre-wrap" }}>{mainText}<span className="streaming-dot" /></div>}
                       </>
@@ -813,7 +805,11 @@ export function ChatView() {
               <datalist id="model-options">
                 {(() => {
                   const cfgProviderId = agentModelConfigs.find((c) => c.agentId === selectedAgentId && !c.useGlobal)?.providerId ?? selectedProviderId;
-                  const cfgModels = models.filter((m) => m.providerId === cfgProviderId);
+                  let cfgModels = models.filter((m) => m.providerId === cfgProviderId);
+                  if (cfgModels.length === 0) {
+                    const cfgProvider = providers.find((pp) => pp.id === cfgProviderId);
+                    if (cfgProvider) cfgModels = getFallbackModels(cfgProvider);
+                  }
                   if (cfgModels.length === 0) return <option value="无模型" />;
                   return cfgModels.map((m) => <option key={m.id} value={m.id} />);
                 })()}

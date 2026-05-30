@@ -456,7 +456,7 @@ export function MobileSettingsView() {
   const updateProvider = (id: string, updater: (p: ProviderConfig) => ProviderConfig) => {
     const newProviders = providers.map((p) => (p.id === id ? updater(p) : p));
     setProviders(newProviders);
-    apiFetch("/api/providers", { method: "PUT", body: JSON.stringify(newProviders) });
+    apiFetch("/api/providers", { method: "PUT", body: JSON.stringify({ providers: newProviders }) });
     syncProvidersToServer();
   };
 

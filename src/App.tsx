@@ -15,6 +15,7 @@ import { RightPanel } from "./views/RightPanel";
 import { SkillsView } from "./views/SkillsView";
 import { MemoryView } from "./views/MemoryView";
 import type { AgentTTSConfig, ModelConfig, ProviderConfig, Skill, TTSProviderConfig } from "./core/types";
+import { getFallbackModels } from "./core/modelGateway";
 import { useKeyboard } from "./lib/useKeyboard";
 import { SunIcon, MoonIcon, BotIcon, UserIcon, ChatIcon } from "./components/icons";
 import { SetupWizard } from "./views/SetupWizard";
@@ -139,8 +140,24 @@ export function App() {
               const discovered = data.models.filter((dm) => !custom.some((cm) => cm.id === dm.id));
               return [...prev.filter((m) => m.providerId !== p.id), ...custom, ...discovered];
             });
+          } else {
+            // Discovery failed — use fallback models
+            const fallbacks = getFallbackModels(p);
+            setModels((prev) => {
+              const existing = prev.filter((m) => m.providerId === p.id);
+              if (existing.length === 0) return [...prev, ...fallbacks];
+              return prev;
+            });
           }
-        } catch {}
+        } catch {
+          // Discovery error — use fallback models
+          const fallbacks = getFallbackModels(p);
+          setModels((prev) => {
+            const existing = prev.filter((m) => m.providerId === p.id);
+            if (existing.length === 0) return [...prev, ...fallbacks];
+            return prev;
+          });
+        }
       }
 
       // Load conversations from server

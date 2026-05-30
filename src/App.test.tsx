@@ -18,7 +18,7 @@ describe("App", () => {
 
   it("shows the status pills with agent count", () => {
     render(<App />);
-    expect(screen.getByText(/11 Agents/)).toBeInTheDocument();
+    expect(screen.getByText(/17 Agents/)).toBeInTheDocument();
   });
 
   it("shows the new conversation button", () => {

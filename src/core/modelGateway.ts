@@ -482,7 +482,8 @@ function applyProviderParams(
       // MiMo web search — only add tools when explicitly enabled
       const mimoWebSearch = req.enableWebSearch === true || (req.enableWebSearch !== false && provider.webSearchEnabled === true);
       if (mimoWebSearch) {
-        body.webSearchEnabled = true;
+        // MiMo API requires webSearchEnabled as string "true"
+        body.webSearchEnabled = "true";
         body.tools = [{
           type: "web_search",
           max_keyword: req.webSearchMaxKeyword ?? provider.webSearchMaxKeyword ?? 3,

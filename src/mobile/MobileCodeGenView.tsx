@@ -2,11 +2,12 @@ import { useState } from "react";
 import { Code2, Loader2, Play, Sparkles } from "lucide-react";
 import { useStore } from "../lib/store";
 import { apiFetch } from "../lib/shared";
+import { getFallbackModels } from "../core/modelGateway";
 
 const PHASES = ["requirements", "design", "generation", "testing", "documentation", "review"] as const;
 const PHASE_NAMES: Record<string, string> = {
   requirements: "需求", design: "设计", generation: "生成",
-  testing: "测试", documentation: "文档", review: "审查",
+  testing: "测试", documentation: "文档", review: "审查", completed: "完成",
 };
 
 const TEMPLATES = [
@@ -16,22 +17,31 @@ const TEMPLATES = [
 ];
 
 export function MobileCodeGenView() {
-  const { getEffectiveConfig, showToast } = useStore();
+  const { providers, models, getEffectiveConfig, showToast } = useStore();
   const [idea, setIdea] = useState("");
   const [stack, setStack] = useState("Vite + React + TypeScript");
   const [streaming, setStreaming] = useState(false);
   const [messages, setMessages] = useState<Array<{ phase: string; content: string; agentName: string }>>([]);
   const [phase, setPhase] = useState("");
+  const [selProviderId, setSelProviderId] = useState("");
+  const [selModelId, setSelModelId] = useState("");
+
+  const curProviderId = selProviderId || getEffectiveConfig("agent-moderator").providerId;
+  const curProvider = providers.find((p) => p.id === curProviderId);
+  const availableModels = models.filter((m) => m.providerId === curProviderId);
+  const fallbackModels = curProvider ? getFallbackModels(curProvider) : [];
+  const displayModels = availableModels.length > 0 ? availableModels : fallbackModels;
+  const curModelId = selModelId || getEffectiveConfig("agent-moderator").modelId;
 
   const start = async () => {
     if (!idea.trim() || streaming) return;
     setStreaming(true);
     setMessages([]);
-    const cfg = getEffectiveConfig("agent-moderator");
+    setPhase("");
     try {
       const resp = await apiFetch("/api/codegen", {
         method: "POST",
-        body: JSON.stringify({ idea, techStack: stack, providerId: cfg.providerId, model: cfg.modelId }),
+        body: JSON.stringify({ idea, techStack: stack, providerId: curProviderId, model: curModelId }),
       });
       if (!resp.ok) throw new Error("Failed");
       const reader = resp.body?.getReader();
@@ -51,7 +61,7 @@ export function MobileCodeGenView() {
             try {
               const d = JSON.parse(line.slice(6));
               if (evt === "phase") setPhase(d.phase);
-              else if (evt === "message") setMessages((p) => [...p, d]);
+              else if (evt === "message" && d.content) setMessages((p) => [...p, d]);
             } catch {}
           }
         }
@@ -104,6 +114,24 @@ export function MobileCodeGenView() {
             {streaming ? <Loader2 size={16} className="spin" /> : <Play size={16} />}
             {streaming ? "生成中" : "开始"}
           </button>
+        </div>
+
+        {/* Model selector */}
+        <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+          <select value={curProviderId} onChange={(e) => { setSelProviderId(e.target.value); setSelModelId(""); }} style={{
+            flex: 1, padding: "6px 8px", borderRadius: 8,
+            border: "1px solid var(--border)", background: "var(--bg-secondary)",
+            fontSize: 11, outline: "none",
+          }}>
+            {providers.filter((p) => p.enabled).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          <select value={curModelId} onChange={(e) => setSelModelId(e.target.value)} style={{
+            flex: 2, padding: "6px 8px", borderRadius: 8,
+            border: "1px solid var(--border)", background: "var(--bg-secondary)",
+            fontSize: 11, outline: "none",
+          }}>
+            {displayModels.map((m) => <option key={m.id} value={m.id}>{m.id}</option>)}
+          </select>
         </div>
 
         {/* Quick templates */}

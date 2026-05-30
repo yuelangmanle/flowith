@@ -5,6 +5,7 @@ import {
   createDefaultProviders,
   discoverModels,
   streamChatCompletion,
+  callChatCompletion,
   getFallbackModels,
   createDefaultTTSProviders,
   callTTS,
@@ -622,12 +623,17 @@ export async function createServer() {
 
         try {
           sendSSE(response, "start", { runId: run.id, idea: body.idea });
+          let lastPhase = "";
           for await (const chunk of runFullPipeline(run, provider, model)) {
-            if (chunk.type === "text") sendSSE(response, "text", chunk);
-            else if (chunk.type === "done") {
-              sendSSE(response, "progress", { phase: run.phase, percentage: getProgressPercentage(run) });
+            if (run.phase !== lastPhase) {
+              sendSSE(response, "phase", { phase: run.phase });
+              lastPhase = run.phase;
+            }
+            if (chunk.type === "text" && chunk.content) {
+              sendSSE(response, "message", { phase: run.phase, content: chunk.content, agentName: chunk.agentName ?? run.phase });
             }
           }
+          sendSSE(response, "phase", { phase: "completed", percentage: 100 });
           sendSSE(response, "complete", { runId: run.id, status: run.status, artifacts: run.artifacts.length });
         } catch (err) {
           run.status = "failed";
@@ -636,6 +642,28 @@ export async function createServer() {
         response.end();
         return;
       }
+
+      // ─── Non-streaming Generate (for AI agent creation etc.) ──
+      if (request.method === "POST" && path === "/api/generate") {
+        const body = await readJson(request) as {
+          providerId?: string;
+          model?: string;
+          messages: Array<{ role: string; content: string }>;
+        };
+
+        const provider = providers.find((p) => p.id === body.providerId) ?? providers.find((p) => p.enabled && p.apiKey);
+        if (!provider) return send(response, 400, { error: "No available provider" });
+        const model = body.model ?? provider.defaultModel ?? getFallbackModels(provider)[0]?.id;
+        if (!model) return send(response, 400, { error: "No model" });
+
+        try {
+          const result = await callChatCompletion({ provider, model, messages: body.messages, stream: false });
+          return send(response, 200, result);
+        } catch (err) {
+          return send(response, 500, { error: err instanceof Error ? err.message : String(err) });
+        }
+      }
+
 
       // ─── Voting ──────────────────────────────────────
       if (request.method === "POST" && path === "/api/votes") {

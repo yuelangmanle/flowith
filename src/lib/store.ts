@@ -105,6 +105,19 @@ interface AppState {
   tokenUsageByConv: Record<string, { promptTokens: number; completionTokens: number; cachedTokens: number; compressionSaved: number }>;
   updateTokenUsage: (convId: string, usage: { prompt?: number; completion?: number; cached?: number; compressionSaved?: number }) => void;
   getConvTokenUsage: (convId: string) => { promptTokens: number; completionTokens: number; cachedTokens: number; compressionSaved: number };
+
+  // Roundtable persistent state
+  rtState: {
+    messages: Array<{ agentId: string; agentName: string; agentColor: string; agentAvatar: string; content: string; round: number }>;
+    report: { title: string; sections: Array<{ heading: string; content: string }>; conclusion: string } | null;
+    streaming: boolean;
+    topic: string;
+    rtAgents: string[];
+    rounds: number;
+  };
+  setRtState: (s: Partial<AppState["rtState"]>) => void;
+  rtAbortController: AbortController | null;
+  setRtAbortController: (c: AbortController | null) => void;
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -318,4 +331,10 @@ export const useStore = create<AppState>((set, get) => ({
   getConvTokenUsage: (convId) => {
     return get().tokenUsageByConv[convId] ?? { promptTokens: 0, completionTokens: 0, cachedTokens: 0, compressionSaved: 0 };
   },
+
+  // Roundtable persistent state
+  rtState: { messages: [], report: null, streaming: false, topic: "", rtAgents: ["agent-moderator", "agent-product", "agent-architecture", "agent-critic"], rounds: 3 },
+  setRtState: (s) => set((prev) => ({ rtState: { ...prev.rtState, ...s } })),
+  rtAbortController: null,
+  setRtAbortController: (c) => set({ rtAbortController: c }),
 }));
