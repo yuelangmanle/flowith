@@ -479,18 +479,18 @@ function applyProviderParams(
     case "xiaomi-mimo": {
       body.temperature = req.temperature ?? 0.7;
       body.max_tokens = req.maxTokens ?? inferMaxTokens(req.messages);
-      // MiMo web search — only add tools when explicitly enabled
+      // MiMo web search — align webSearchEnabled with tools presence
       const mimoWebSearch = req.enableWebSearch === true || (req.enableWebSearch !== false && provider.webSearchEnabled === true);
       if (mimoWebSearch) {
-        // MiMo API requires webSearchEnabled as string "true"
-        body.webSearchEnabled = "true";
+        body.webSearchEnabled = true;
         body.tools = [{
           type: "web_search",
           max_keyword: req.webSearchMaxKeyword ?? provider.webSearchMaxKeyword ?? 3,
         }];
+      } else {
+        // Explicitly disable to prevent MiMo API "tool found but webSearchEnabled is false" error
+        body.webSearchEnabled = false;
       }
-      // When disabled: don't send webSearchEnabled or tools at all
-      // MiMo API rejects mismatched webSearchEnabled/tools presence
       break;
     }
 
