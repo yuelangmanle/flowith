@@ -60,6 +60,29 @@ export function MobileApp() {
         }
       } catch {}
 
+      // Load agent model configs, agent TTS configs, and TTS providers
+      try {
+        const amResp = await apiFetch("/api/agent-models");
+        if (amResp.ok) {
+          const amData = await amResp.json() as any;
+          if (amData?.configs) store.setAgentModelConfigs(amData.configs);
+        }
+      } catch {}
+      try {
+        const atResp = await apiFetch("/api/agent-tts-configs");
+        if (atResp.ok) {
+          const atData = await atResp.json() as any;
+          if (atData?.configs) store.setAgentTTSConfigs(atData.configs);
+        }
+      } catch {}
+      try {
+        const tpResp = await apiFetch("/api/tts-providers");
+        if (tpResp.ok) {
+          const tpData = await tpResp.json();
+          if (Array.isArray(tpData)) store.setTTSProviders(tpData);
+        }
+      } catch {}
+
       // Discover models for enabled providers
       // Use API response directly (store.providers may not be updated yet)
       let loadedProviders: ProviderConfig[] = [];
