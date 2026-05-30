@@ -127,7 +127,8 @@ export function MobileSkillsView() {
     const updated = { ...skill, installed: true, installedAt: new Date().toISOString() };
     setSkills((prev) => prev.map((s) => (s.id === skill.id ? updated : s)));
     try {
-      await apiFetch("/api/skills", { method: "PUT", body: JSON.stringify(skills.map((s) => (s.id === skill.id ? updated : s))) });
+      const installed = skills.map((s) => (s.id === skill.id ? updated : s));
+      await apiFetch("/api/skills", { method: "PUT", body: JSON.stringify({ skills: installed.filter((s) => s.installed) }) });
     } catch {}
     showToast(`已安装 ${skill.nameZh}`, "success");
   };
@@ -135,7 +136,7 @@ export function MobileSkillsView() {
   const uninstallSkill = async (id: string) => {
     const updated = skills.map((s) => (s.id === id ? { ...s, installed: false } : s));
     setSkills(updated);
-    try { await apiFetch("/api/skills", { method: "PUT", body: JSON.stringify(updated) }); } catch {}
+    try { await apiFetch("/api/skills", { method: "PUT", body: JSON.stringify({ skills: updated.filter((s) => s.installed) }) }); } catch {}
     showToast("已卸载", "success");
   };
 
@@ -143,16 +144,18 @@ export function MobileSkillsView() {
     if (!githubUrl.trim()) return;
     setInstalling(true);
     try {
-      const resp = await apiFetch("/api/skills/install-github", {
+      const resp = await apiFetch("/api/skills/install-url", {
         method: "POST",
         body: JSON.stringify({ url: githubUrl.trim() }),
       });
       if (resp.ok) {
-        const data = (await resp.json()) as { skill: Skill };
-        setSkills((prev) => [...prev.filter((s) => s.id !== data.skill.id), { ...data.skill, installed: true }]);
+        const skill = (await resp.json()) as Skill;
+        setSkills((prev) => [...prev.filter((s) => s.id !== skill.id), { ...skill, installed: true }]);
         setGithubUrl("");
         setShowGithubInstall(false);
-        showToast(`已安装 ${data.skill.nameZh ?? data.skill.name}`, "success");
+        const allSkills = [...skills.filter((s) => s.id !== skill.id), { ...skill, installed: true }];
+        await apiFetch("/api/skills", { method: "PUT", body: JSON.stringify({ skills: allSkills.filter((s) => s.installed) }) });
+        showToast(`已安装 ${skill.nameZh ?? skill.name}`, "success");
       } else {
         showToast("安装失败，请检查 URL", "error");
       }
@@ -186,7 +189,7 @@ export function MobileSkillsView() {
         installedAt: new Date().toISOString(),
       };
       setSkills((prev) => [...prev.filter((s) => s.id !== newSkill.id), newSkill]);
-      await apiFetch("/api/skills", { method: "PUT", body: JSON.stringify([...skills, newSkill]) });
+      await apiFetch("/api/skills", { method: "PUT", body: JSON.stringify({ skills: [...skills.filter((s) => s.installed), newSkill] }) });
       showToast(`已导入 ${newSkill.nameZh}`, "success");
     } catch {
       showToast("导入失败，请检查文件格式", "error");
