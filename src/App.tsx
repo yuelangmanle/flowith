@@ -1,7 +1,7 @@
 import { useEffect, useState, Component, type ReactNode } from "react";
 import {
   Bot, Code2, Database, Download, FolderOpen, Loader2, MessageSquare, MessageSquarePlus, PackagePlus,
-  PanelLeftClose, PanelLeftOpen, Pin, Search, Settings, Trash2, Users,
+  PanelLeftClose, PanelLeftOpen, Pencil, Pin, Search, Settings, Trash2, Users,
 } from "lucide-react";
 import { useStore } from "./lib/store";
 import { apiFetch } from "./lib/shared";
@@ -51,6 +51,9 @@ export function App() {
 
   const [setupDone, setSetupDone] = useState(() => localStorage.getItem("flowith-setup-done") === "true");
   const [convSearch, setConvSearch] = useState("");
+  const [agentFilter, setAgentFilter] = useState<string | null>(null);
+  const [renamingConvId, setRenamingConvId] = useState<string | null>(null);
+  const [renameText, setRenameText] = useState("");
 
   const exportConversation = (conv: typeof conversations[0]) => {
     const md = `# ${conv.title}\n\n` + conv.messages.map((m) => {
@@ -208,7 +211,7 @@ export function App() {
               <div style={{ display: "flex", alignItems: "center", gap: 4, padding: "2px 8px 4px", flexShrink: 0, overflowX: "auto" }}>
                 <button className="quick-chat-avatar" title="自由对话（无预设）" onClick={() => { createConversation("chat", "自由对话"); setSelectedAgentId(""); setView("chat"); }}><ChatIcon size={18} /></button>
                 {agents.map((a) => (
-                  <button key={a.id} className="quick-chat-avatar" title={a.name} onClick={() => { createConversation("chat", `与${a.name}对话`); setSelectedAgentId(a.id); setView("chat"); }}>
+                  <button key={a.id} className="quick-chat-avatar" title={a.name} onClick={() => { (() => { const c = createConversation("chat", `与${a.name}对话`); c.agentIds = [a.id]; return c; })(); setSelectedAgentId(a.id); setView("chat"); }}>
                     {a.avatar}
                   </button>
                 ))}
@@ -219,13 +222,27 @@ export function App() {
                   <Search size={12} style={{ color: "var(--text-muted)", flexShrink: 0 }} />
                   <input placeholder="搜索对话..." value={convSearch} onChange={(e) => setConvSearch(e.target.value)} style={{ border: "none", background: "transparent", fontSize: 12, flex: 1, outline: "none", color: "var(--text)" }} />
                 </div>
+                {/* Agent 筛选 */}
+                {agents.length > 0 && (
+                  <div style={{ display: "flex", gap: 3, flexWrap: "wrap", marginTop: 4 }}>
+                    <button onClick={() => setAgentFilter(null)} style={{ fontSize: 10, padding: "2px 6px", borderRadius: 10, border: `1px solid ${agentFilter === null ? "var(--primary)" : "var(--border)"}`, background: agentFilter === null ? "var(--primary)" : "transparent", color: agentFilter === null ? "#fff" : "var(--text-muted)", cursor: "pointer" }}>全部</button>
+                    {agents.map((a) => (
+                      <button key={a.id} onClick={() => setAgentFilter(agentFilter === a.id ? null : a.id)} style={{ fontSize: 10, padding: "2px 6px", borderRadius: 10, border: `1px solid ${agentFilter === a.id ? "var(--primary)" : "var(--border)"}`, background: agentFilter === a.id ? "var(--primary)" : "transparent", color: agentFilter === a.id ? "#fff" : "var(--text-muted)", cursor: "pointer" }}>{a.avatar} {a.name}</button>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="conversation-list">
-                {[...conversations].sort((a, b) => { if (a.pinned && !b.pinned) return -1; if (!a.pinned && b.pinned) return 1; return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(); }).filter((c) => !convSearch || c.title.toLowerCase().includes(convSearch.toLowerCase()) || c.messages.some((m) => m.content.toLowerCase().includes(convSearch.toLowerCase()))).map((c) => (
+                {[...conversations].sort((a, b) => { if (a.pinned && !b.pinned) return -1; if (!a.pinned && b.pinned) return 1; return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(); }).filter((c) => (!convSearch || c.title.toLowerCase().includes(convSearch.toLowerCase()) || c.messages.some((m) => m.content.toLowerCase().includes(convSearch.toLowerCase()))) && (!agentFilter || c.agentIds.includes(agentFilter))).map((c) => (
                   <div key={c.id} className={`conv-item ${store.activeConvId === c.id ? "active" : ""} ${c.pinned ? "pinned" : ""}`} onClick={() => { store.setActiveConvId(c.id); setView("chat"); }}>
                     {c.pinned && <Pin size={10} style={{ color: "var(--primary)", flexShrink: 0 }} />}
-                    <span className="conv-title">{c.title}</span>
+                    {renamingConvId === c.id ? (
+                      <input value={renameText} onChange={(e) => setRenameText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { store.setConversations((prev) => prev.map((x) => x.id === c.id ? { ...x, title: renameText } : x)); setRenamingConvId(null); store.showToast("已重命名", "success"); } if (e.key === "Escape") setRenamingConvId(null); }} onBlur={() => { store.setConversations((prev) => prev.map((x) => x.id === c.id ? { ...x, title: renameText } : x)); setRenamingConvId(null); }} onClick={(e) => e.stopPropagation()} autoFocus style={{ flex: 1, padding: "1px 4px", borderRadius: 4, border: "1px solid var(--primary)", background: "var(--bg)", color: "var(--text)", fontSize: 12, outline: "none" }} />
+                    ) : (
+                      <span className="conv-title">{c.title}</span>
+                    )}
                     <span className="conv-type">{c.type === "roundtable" ? "圆桌" : c.type === "group-chat" ? "群聊" : c.branchedFrom ? "分支" : "对话"}</span>
+                    <button className="icon-btn" onClick={(e) => { e.stopPropagation(); setRenamingConvId(c.id); setRenameText(c.title); }} title="重命名" style={{ padding: "2px 4px" }}><Pencil size={10} /></button>
                     <button className="icon-btn" onClick={(e) => { e.stopPropagation(); pinConversation(c.id); }} title={c.pinned ? "取消置顶" : "置顶"} style={{ padding: "2px 4px", color: c.pinned ? "var(--primary)" : "var(--text-muted)" }}><Pin size={10} /></button>
                     <button className="icon-btn" onClick={(e) => { e.stopPropagation(); exportConversation(c); }} title="导出" style={{ padding: "2px 4px" }}><Download size={10} /></button>
                     <button className="delete-btn" onClick={(e) => { e.stopPropagation(); deleteConversation(c.id); }}><Trash2 size={12} /></button>

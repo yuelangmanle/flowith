@@ -539,12 +539,11 @@ export function MobileChatView() {
   };
 
   const handleRegenerate = (msg: ChatMessage) => {
-    // Find the user message before this assistant message
     if (!activeConv) return;
     const idx = activeConv.messages.findIndex((m) => m.id === msg.id);
     const userMsg = activeConv.messages.slice(0, idx).reverse().find((m) => m.role === "user");
     if (!userMsg) return;
-    // Remove this assistant message and re-send
+    // Remove this assistant message and auto-re-send
     setConversations((prev) =>
       prev.map((c) =>
         c.id === activeConvId
@@ -552,10 +551,13 @@ export function MobileChatView() {
           : c
       )
     );
-    setInput(userMsg.content);
-    // Will be sent when user hits send
     setMsgActionId(null);
-    showToast("消息已回退，请重新发送", "info");
+    // Auto-send after state update
+    const content = userMsg.content;
+    setTimeout(() => {
+      setInput(content);
+      setTimeout(() => sendMessage(), 50);
+    }, 100);
   };
 
   const handleDeleteMsg = (msgId: string) => {
@@ -660,20 +662,24 @@ export function MobileChatView() {
               ))}
             </select>
             <span style={{ fontSize: 10, color: "var(--text-muted)" }}>/</span>
-            <select
+            <input
+              list="mobile-model-options"
               value={selectedModelId}
               onChange={(e) => setSelectedModelId(e.target.value)}
+              placeholder="搜索模型..."
               style={{
                 padding: "4px 8px", borderRadius: 6, border: "1px solid var(--border)",
-                background: "var(--bg-card)", fontSize: 11, maxWidth: 160,
+                background: "var(--bg-card)", fontSize: 11, maxWidth: 160, width: 140,
+                color: "var(--text-primary)",
               }}
-            >
+            />
+            <datalist id="mobile-model-options">
               {models.filter((m) => m.providerId === selectedProviderId).map((m) => (
                 <option key={m.id} value={m.id}>
-                  {m.id} {m.capabilities.reasoning ? " [思考]" : ""}{m.capabilities.vision ? " [视觉]" : ""}
+                  {m.id}{m.capabilities.reasoning ? " [思考]" : ""}{m.capabilities.vision ? " [视觉]" : ""}
                 </option>
               ))}
-            </select>
+            </datalist>
           </div>
         )}
       </div>

@@ -42,6 +42,8 @@ export function ChatView() {
   const abortRef = useRef<AbortController | null>(null);
   const [expandedMsgs, setExpandedMsgs] = useState<Set<string>>(new Set());
   const [specifiedSkill, setSpecifiedSkill] = useState<string>("");
+  const [editingMsgId, setEditingMsgId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
   const [showSkillPicker, setShowSkillPicker] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatAreaRef = useRef<HTMLDivElement>(null);
@@ -597,7 +599,7 @@ export function ChatView() {
                       const prevUserMsg = msgIdx && activeConversation ? activeConversation.messages.slice(0, msgIdx).reverse().find((m) => m.role === "user") : null;
                       if (prevUserMsg) {
                         // Send without image prefix (raw content)
-                        setChatInput(prevUserMsg.content);
+                        sendChatMessage(prevUserMsg.content);
                       }
                     }} title="重新生成" style={{ fontSize: 11, padding: "2px 4px", display: "inline-flex", alignItems: "center" }}>
                       <RefreshCw size={12} />
@@ -692,6 +694,15 @@ export function ChatView() {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M4 4h16a2 2 0 012 2v10a2 2 0 01-2 2H8l-4 4V6a2 2 0 012-2z" fill="currentColor"/></svg>
             <span>输出 <strong>{convTokenUsage.completionTokens.toLocaleString()}</strong></span>
           </span>
+          {(() => {
+            const totalTokens = convTokenUsage.promptTokens + convTokenUsage.completionTokens;
+            const costEstimate = totalTokens * 0.000002;
+            return costEstimate > 0.001 ? (
+              <span style={{ color: "#f59e0b", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                💰 约 <strong>${'{'}costEstimate.toFixed(4){'}'}</strong>
+              </span>
+            ) : null;
+          })()}
           {convTokenUsage.cachedTokens > 0 && (
             <span style={{ color: "#4ade80", display: "inline-flex", alignItems: "center", gap: 4 }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none"/><path d="M8 12l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>
@@ -784,22 +795,29 @@ export function ChatView() {
                 {providers.filter((p) => p.enabled).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
               <span style={{ fontSize: 10, color: "var(--border)" }}>|</span>
-              <select value={agentModelConfigs.find((c) => c.agentId === selectedAgentId && !c.useGlobal)?.modelId ?? selectedModelId} onChange={(e) => {
-                const v = e.target.value;
-                const existingCfg = agentModelConfigs.find((c) => c.agentId === selectedAgentId && !c.useGlobal);
-                if (existingCfg) {
-                  const newConfigs = agentModelConfigs.map((c) => c.agentId === selectedAgentId ? { ...c, modelId: v } : c);
-                  setAgentModelConfigs(newConfigs);
-                  apiFetch("/api/agent-models", { method: "PUT", body: JSON.stringify({ configs: newConfigs }) });
-                } else { setSelectedModelId(v); }
-              }}>
+              <input
+                list="model-options"
+                value={agentModelConfigs.find((c) => c.agentId === selectedAgentId && !c.useGlobal)?.modelId ?? selectedModelId}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  const existingCfg = agentModelConfigs.find((c) => c.agentId === selectedAgentId && !c.useGlobal);
+                  if (existingCfg) {
+                    const newConfigs = agentModelConfigs.map((c) => c.agentId === selectedAgentId ? { ...c, modelId: v } : c);
+                    setAgentModelConfigs(newConfigs);
+                    apiFetch("/api/agent-models", { method: "PUT", body: JSON.stringify({ configs: newConfigs }) });
+                  } else { setSelectedModelId(v); }
+                }}
+                placeholder="搜索或选择模型..."
+                style={{ minWidth: 120, maxWidth: 200, padding: "2px 6px", borderRadius: 4, border: "1px solid var(--border)", background: "var(--bg)", color: "var(--text-primary)", fontSize: 11 }}
+              />
+              <datalist id="model-options">
                 {(() => {
                   const cfgProviderId = agentModelConfigs.find((c) => c.agentId === selectedAgentId && !c.useGlobal)?.providerId ?? selectedProviderId;
                   const cfgModels = models.filter((m) => m.providerId === cfgProviderId);
-                  if (cfgModels.length === 0) return <option value="">无模型</option>;
-                  return cfgModels.map((m) => <option key={m.id} value={m.id}>{m.id}</option>);
+                  if (cfgModels.length === 0) return <option value="无模型" />;
+                  return cfgModels.map((m) => <option key={m.id} value={m.id} />);
                 })()}
-              </select>
+              </datalist>
             </div>
             {(() => {
               const cfgProviderId = agentModelConfigs.find((c) => c.agentId === selectedAgentId && !c.useGlobal)?.providerId ?? selectedProviderId;
