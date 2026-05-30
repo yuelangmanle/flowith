@@ -21,6 +21,19 @@
 - 代码生成页面新增 Provider/Model 快捷选择器
 - Agent 管理页面新增"AI 帮我创建"按钮
 
+### 🔧 追加修复
+- **手机端 Skills 持久化**: 安装/卸载/导入发送裸数组→包裹对象，修复重启后丢失
+- **手机端 Skills GitHub 安装**: 端点 URL 错误（install-github→install-url）+ 响应解析修复
+- **手机端启动数据补全**: 补全 Agent 模型配置、TTS 配置、TTS 供应商的冷启动加载
+- **MiMo Web Search 增强**: 禁用时显式发送 `webSearchEnabled: false`，防止 400 错误
+- **版本号统一**: 8 个文件统一更新，创建自动化脚本防止遗漏
+- **Release Workflow 修复**: publish-updater 从 detached HEAD 改为 checkout main
+
+### 🛠️ 工程化
+- 新增 `scripts/bump-version.mjs` 版本号统一更新脚本
+- 新增 `src/lib/version.ts` 版本号单一真相源
+- 新增 `DEVELOPMENT.md` 项目开发规范书
+
 ---
 
 ## v1.3.5 (2026-05-30)

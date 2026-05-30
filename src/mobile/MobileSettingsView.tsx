@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { useStore } from "../lib/store";
 import { apiFetch, getProviderIcon } from "../lib/shared";
+import { APP_VERSION } from "../lib/version";
 // Provider persistence handled via apiFetch
 import type { ProviderConfig, TTSProviderConfig, ModelConfig } from "../core/types";
 
@@ -588,7 +589,7 @@ export function MobileSettingsView() {
 
         {/* ─── Auto-update ─── */}
         <div style={{ marginBottom: 20, display: "flex", alignItems: "center", gap: 8 }}>
-          <UpdateChecker currentVersion="1.3.6" platform="android" mode="compact" />
+          <UpdateChecker currentVersion={APP_VERSION} platform="android" mode="compact" />
         </div>
 
         {/* ─── Token Stats ─── */}
@@ -650,7 +651,7 @@ export function MobileSettingsView() {
           }}>
             <span style={{ fontSize: 16 }}>📋</span>
             <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text-primary)" }}>更新日志</span>
-            <span style={{ fontSize: 11, color: "var(--text-muted)", background: "var(--bg-secondary)", padding: "2px 8px", borderRadius: 4, marginLeft: "auto" }}>v1.3.6</span>
+            <span style={{ fontSize: 11, color: "var(--text-muted)", background: "var(--bg-secondary)", padding: "2px 8px", borderRadius: 4, marginLeft: "auto" }}>{`v${APP_VERSION}`}</span>
             {showChangelog ? <ChevronDown size={16} style={{ color: "var(--text-muted)" }} /> : <ChevronRight size={16} style={{ color: "var(--text-muted)" }} />}
           </button>
           {showChangelog && (
@@ -694,7 +695,7 @@ function StatCard({ label, value, color }: { label: string; value: string; color
 
 const changelog = [
   {
-    version: "v1.3.6",
+    version: "v1.3.7",
     date: "2026-05-30",
     changes: [
       "🖼️ 移动端图片/文件上传修复",

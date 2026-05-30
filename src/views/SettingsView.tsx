@@ -7,7 +7,7 @@ import { saveProviders } from "../core/persistence";
 import type { ModelConfig, ProviderConfig, TTSProviderConfig } from "../core/types";
 
 // App version
-const APP_VERSION = "1.3.6";
+import { APP_VERSION } from "../lib/version";
 function detectPlatform(): "mac" | "win" | "android" {
   if ((window as any).Capacitor) return "android";
   const ua = navigator.userAgent.toLowerCase();
@@ -671,7 +671,7 @@ function ChangelogSection() {
   const [expanded, setExpanded] = useState(false);
   const versions = [
     {
-      version: "v1.3.6",
+      version: "v1.3.7",
       date: "2026-05-30",
       changes: [
         "🖼️ 移动端图片/文件上传修复",
@@ -795,7 +795,7 @@ function ChangelogSection() {
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontSize: 16 }}>📋</span>
           <span style={{ fontSize: 14, fontWeight: 600 }}>更新日志</span>
-          <span style={{ fontSize: 11, color: "var(--text-muted)", background: "var(--bg)", padding: "2px 8px", borderRadius: 4 }}>v1.3.6</span>
+          <span style={{ fontSize: 11, color: "var(--text-muted)", background: "var(--bg)", padding: "2px 8px", borderRadius: 4 }}>{`v${APP_VERSION}`}</span>
         </div>
         <span style={{ fontSize: 12, color: "var(--text-muted)" }}>{expanded ? "收起" : "展开"}</span>
       </div>
